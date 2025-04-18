@@ -37,6 +37,10 @@ export class ThunderLink {
     const { data } = await this.client.post("/wallet/get-asset-balance", { assetId });
     return data;
   }
+  async issueAssetNia(params: { ticker: string; name: string, amount: number[]; precision: number; }) {
+    const { data } = await this.client.post("/wallet/issue-asset-nia", params);
+    return data;
+  }
 
   async listAssets() {
     const { data } = await this.client.post("/wallet/list-assets");

@@ -66,6 +66,10 @@ export class WalletManager {
     return await this.getSdk().generateInvoice(params);
   }
 
+  public async issueAssetNia(params: { ticker: string; name: string; amount: number[]; precision: number }) {
+    return await this.getSdk().issueAssetNia(params);
+  }
+
   public async signPsbt({ psbtBase64, mnemonic }: SignPsbtParams) {
     const seed = mnemonicToSeedSync(mnemonic);
     const descriptors = bdk.seed_to_descriptor(seed, network, 'p2tr');
