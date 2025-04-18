@@ -1,0 +1,48 @@
+{
+  "name": "thunderlink-sdk",
+  "version": "1.0.0",
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.3"
+  },
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "tsc -w",
+    "build": "tsup src/index.ts --format cjs --target node18 --dts --out-dir dist",
+    "example": "node scripts/signPsbt.mjs",
+    "initWallet": "node scripts/initWallet.js",
+    "demo": "node scripts/demo.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "dependencies": {
+    "@bitcoinerlab/secp256k1": "^1.2.0",
+    "axios": "^1.8.4",
+    "bip32": "^5.0.0-rc.0",
+    "bip39": "^3.1.0",
+    "bitcoindevkit": "^0.1.5",
+    "bitcoinjs-lib": "^6.1.7",
+    "ecpair": "^3.0.0",
+    "os": "^0.1.2",
+    "rgb-lib": "^0.3.0-alpha.12.1",
+    "tiny-secp256k1": "^2.2.3"
+  },
+  "keywords": [
+    "bdk",
+    "bitcoin",
+    "sdk",
+    "wasm"
+  ],
+  "license": "MIT"
+}
