@@ -1,4 +1,4 @@
 declare module 'rgb-lib' {
-    const mod: any;
-    export = mod;
-  }
+  const mod: any;
+  export = mod;
+}

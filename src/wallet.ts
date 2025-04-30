@@ -2,6 +2,7 @@ import { mnemonicToSeedSync } from 'bip39';
 import init, * as bdk from '../bdk-wasm/pkg/bitcoindevkit.js';
 import { Wallet, Network } from '../bdk-wasm/pkg/bitcoindevkit.js';
 import { ThunderLink } from './client';
+import { FailTransfersRequest } from './types/rgb-model';
 
 const rgblib = require('rgb-lib');
 const network: Network = 'regtest';
@@ -15,7 +16,7 @@ export class WalletManager {
   private sdk: ThunderLink | null = null;
   private xpub: string | null = null;
 
-  constructor() {}
+  constructor() { }
 
   public init(xpub: string) {
     this.sdk = new ThunderLink({ xpub });
@@ -36,6 +37,10 @@ export class WalletManager {
 
   public async createWallet() {
     return rgblib.generateKeys(rgblib.BitcoinNetwork.Regtest);
+  }
+
+  public async registerWallet() {
+    return await this.getSdk().registerWallet();
   }
 
   public async getBtcBalance() {
@@ -62,8 +67,8 @@ export class WalletManager {
     return await this.getSdk().createUtxosEnd(params);
   }
 
-  public async generateInvoice(params: { assetId: string; amount: number }) {
-    return await this.getSdk().generateInvoice(params);
+  public async blindRecive(params: { asset_id: string; amount: number }) {
+    return await this.getSdk().blindRecive(params);
   }
 
   public async issueAssetNia(params: { ticker: string; name: string; amount: number[]; precision: number }) {
@@ -83,6 +88,18 @@ export class WalletManager {
     }
 
     return pstb.toString();
+  }
+  public async refreshWallet() {
+    return await this.getSdk().refreshWallet();
+  }
+  public async listTransactions() {
+    return await this.getSdk().listTransactions();
+  }
+  public async listTransfers(asset_id: string) {
+    return await this.getSdk().listTransfers(asset_id);
+  }
+  public async failTransfers(params: FailTransfersRequest) {
+    return await this.getSdk().failTransfers(params);
   }
 }
 
