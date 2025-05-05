@@ -46,6 +46,9 @@ export class WalletManager {
   public async getBtcBalance() {
     return await this.getSdk().getBtcBalance();
   }
+  public async getAddress() {
+    return await this.getSdk().getAddress();
+  }
 
   public async listUnspents() {
     return await this.getSdk().listUnspents();

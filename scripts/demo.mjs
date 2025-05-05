@@ -1,12 +1,12 @@
 
 // import { listUnspents, initWallet, createUtxosBegin, signPsbt, createUtxosEnd, getBtcBalance, listAssets, getAssetBalance, generateInvoice } from '../dist/index.js';
 import { wallet } from "../dist/index.cjs";
-const xpub = 'tpubDCNyfuS6Are75WRm61sf38RKEBbntVbMQyAuTTPAEaVFezU8yPWDreezPf38wxvcLgT3UjH5AsnegrfRniku1HWz9HN2bvCLxxgESeAUqJf'
+// const xpub = 'tpubDCNyfuS6Are75WRm61sf38RKEBbntVbMQyAuTTPAEaVFezU8yPWDreezPf38wxvcLgT3UjH5AsnegrfRniku1HWz9HN2bvCLxxgESeAUqJf'
 const mnemonic = 'melody fee hero onion rapid bullet again exile exact exile slogan grace'
 const asset_id ='rgb:49vaJ7XR-U7flPJB-Lb2l7cq-plK7uFu-ZEfls4!-DTECPAw'
 // const init = await initWallet(xpub);
 // console.log('init', init);
-// const unspents = await listUnspents(xpub);
+// const unspents = await listUnspents('tpubD6NzVbkrYhZ4XDHNmegzuvaCFPuehC3G9Y61prY1KLoK51FWtHF65vexwE2BfbFSW23T3BKp8HBCqRJmF7Dxf6twi1R8BqC8C75X1PU8Tkc');
 // console.log('listUnspends', unspents);
 
 
@@ -33,7 +33,7 @@ const asset_id ='rgb:49vaJ7XR-U7flPJB-Lb2l7cq-plK7uFu-ZEfls4!-DTECPAw'
 // const assetBalance = await getAssetBalance(xpub, 'rgb:tV4HWYaf-cL194Ms-wybCrE9-1VDcchJ-lpuMv7Q-5PmlErM');
 // const assetBalance = await listAssets(xpub);
 // console.log('assets', assetBalance);
-wallet.init(xpub)
+wallet.init('tpubD6NzVbkrYhZ4XDHNmegzuvaCFPuehC3G9Y61prY1KLoK51FWtHF65vexwE2BfbFSW23T3BKp8HBCqRJmF7Dxf6twi1R8BqC8C75X1PU8Tkc')
 // const assetBalance = await wallet.listAssets();
 // console.log('assets', JSON.stringify(assetBalance));
 // const balance = await wallet.getBtcBalance();
@@ -43,16 +43,21 @@ wallet.init(xpub)
 // const refresh = await wallet.refreshWallet();
 // console.log('refresh', refresh);
 
-const listTransactionsafter = await wallet.listTransfers(asset_id);
-console.log('------listTransactionsafter', JSON.stringify(listTransactionsafter));
+// const keys = await wallet.createWallet();
+// console.log(JSON.stringify(keys))
+
+// const listTransactionsafter = await wallet.listAssets();
+// console.log('------listTransactionsafter', JSON.stringify(listTransactionsafter));
 // const listUnspents = await wallet.listUnspents();
 // console.log('------listUnspents', JSON.stringify(listUnspents.unspents));
 // const invoice = await wallet.generateInvoice({amount: 100, asset_id});
 
 // console.log('--------invoice', invoice);
 
+
+
 // const listUnspents2 = await wallet.listUnspents();
-// console.log('-------listUnspents2', JSON.stringify(listUnspents2.unspents[2]));
+// console.log('-------listUnspents2', JSON.stringify(listUnspents2));
 // (async () => {
 // const xpub = 'tpubDCNyfuS6Are75WRm61sf38RKEBbntVbMQyAuTTPAEaVFezU8yPWDreezPf38wxvcLgT3UjH5AsnegrfRniku1HWz9HN2bvCLxxgESeAUqJf'
 // const mnemonic = 'melody fee hero onion rapid bullet again exile exact exile slogan grace'

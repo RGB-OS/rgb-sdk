@@ -18,6 +18,10 @@ export class ThunderLink {
     const { data } = await this.client.post("/wallet/btc-balance");
     return data;
   }
+  async getAddress(): Promise<string> {
+    const { data } = await this.client.post("/wallet/get-address");
+    return data;
+  }
 
   async listUnspents(): Promise<Unspent[]> {
     const { data } = await this.client.post("/wallet/list-unspents");
