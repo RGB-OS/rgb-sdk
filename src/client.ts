@@ -15,45 +15,45 @@ export class ThunderLink {
   }
 
   async getBtcBalance(): Promise<BtcBalance> {
-    const { data } = await this.client.post("/wallet/btc-balance");
+    const { data } = await this.client.post("/wallet/btcbalance");
     return data;
   }
   async getAddress(): Promise<string> {
-    const { data } = await this.client.post("/wallet/get-address");
+    const { data } = await this.client.post("/wallet/address");
     return data;
   }
 
   async listUnspents(): Promise<Unspent[]> {
-    const { data } = await this.client.post("/wallet/list-unspents");
+    const { data } = await this.client.post("/wallet/listunspents");
     return data;
   }
 
   async createUtxosBegin(params: { upTo?: boolean; num?: number; size?: number; feeRate?: number }): Promise<string> {
-    const { data } = await this.client.post("/wallet/create-utxos-begin", params);
+    const { data } = await this.client.post("/wallet/createutxosbegin", params);
     return data;
   }
 
   async createUtxosEnd(params: { signedPsbt: string }): Promise<number> {
-    const { data } = await this.client.post("/wallet/create-utxos-end", params);
+    const { data } = await this.client.post("/wallet/createutxosend", params);
     return data;
   }
 
   async blindRecive(params: { asset_id: string; amount: number }): Promise<InvoiceReciveData> {
-    const { data } = await this.client.post("/blind-receive", params);
+    const { data } = await this.client.post("/blindreceive", params);
     return data;
   }
 
   async getAssetBalance(assetId: string):Promise<AssetBalanceResponse> {
-    const { data } = await this.client.post("/wallet/get-asset-balance", { assetId });
+    const { data } = await this.client.post("/wallet/assetbalance", { assetId });
     return data;
   }
   async issueAssetNia(params: { ticker: string; name: string, amount: number[]; precision: number; }):Promise<IssueAssetNIAResponse> {
-    const { data } = await this.client.post("/wallet/issue-asset-nia", params);
+    const { data } = await this.client.post("/wallet/issueassetnia", params);
     return data;
   }
 
   async listAssets(): Promise<ListAssetsResponse> {
-    const { data } = await this.client.post("/wallet/list-assets");
+    const { data } = await this.client.post("/wallet/listassets");
     return data;
   }
 
@@ -68,16 +68,16 @@ export class ThunderLink {
   }
 
   async listTransactions() {
-    const { data } = await this.client.post("/wallet/list-transactions");
+    const { data } = await this.client.post("/wallet/listtransactions");
     return data;
   }
   async listTransfers(asset_id: string): Promise<RgbTransfer[]> {
-    const { data } = await this.client.post("/wallet/list-transfers", { asset_id });
+    const { data } = await this.client.post("/wallet/listtransfers", { asset_id });
     return data;
   }
   async failTransfers(params: FailTransfersRequest): Promise<boolean> {
     const { batch_transfer_idx, no_asset_only = false, skip_sync = false } = params;
-    const { data } = await this.client.post("/wallet/fail-transfers", { batch_transfer_idx, no_asset_only, skip_sync });
+    const { data } = await this.client.post("/wallet/failtransfers", { batch_transfer_idx, no_asset_only, skip_sync });
     return data;
   }
 }
