@@ -13,6 +13,9 @@
     "dev": "tsc -w",
     "build": "tsup",
     "prepare": "npm run build",
+    "version:patch": "npm version patch && git push && git push --tags && npm publish --access public",
+    "version:minor": "npm version minor && git push && git push --tags && npm publish --access public",
+    "version:major": "npm version major && git push && git push --tags && npm publish --access public",
     "example": "node scripts/signPsbt.mjs",
     "initWallet": "node scripts/initWallet.js",
     "demo": "node scripts/demo.mjs"
