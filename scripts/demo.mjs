@@ -56,8 +56,8 @@ wallet.init('tpubD6NzVbkrYhZ4XDHNmegzuvaCFPuehC3G9Y61prY1KLoK51FWtHF65vexwE2BfbF
 
 
 
-// const listUnspents2 = await wallet.listUnspents();
-// console.log('-------listUnspents2', JSON.stringify(listUnspents2));
+const listUnspents2 = await wallet.listUnspents();
+console.log('-------listUnspents2', JSON.stringify(listUnspents2));
 // (async () => {
 // const xpub = 'tpubDCNyfuS6Are75WRm61sf38RKEBbntVbMQyAuTTPAEaVFezU8yPWDreezPf38wxvcLgT3UjH5AsnegrfRniku1HWz9HN2bvCLxxgESeAUqJf'
 // const mnemonic = 'melody fee hero onion rapid bullet again exile exact exile slogan grace'
