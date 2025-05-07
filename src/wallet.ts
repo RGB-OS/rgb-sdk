@@ -1,6 +1,6 @@
 import { mnemonicToSeedSync } from 'bip39';
-import init, * as bdk from '../external/bdk-wasm/pkg/bitcoindevkit.js';
-import { Wallet, Network } from '../external/bdk-wasm/pkg/bitcoindevkit.js';
+import init, * as bdk from '../bundles/wasm/bitcoindevkit.js';
+import { Wallet, Network } from '../bundles/wasm/bitcoindevkit.js';
 import { ThunderLink } from './client';
 import { FailTransfersRequest } from './types/rgb-model';
 

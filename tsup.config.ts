@@ -8,6 +8,6 @@ export default defineConfig({
   dts: true,
   outExtension: () => ({ js: '.cjs' }),
   onSuccess: async () => {
-    copyFileSync('src/bitcoindevkit_bg.wasm', 'dist/bitcoindevkit_bg.wasm');
+    copyFileSync('bundles/wasm/bitcoindevkit_bg.wasm', 'dist/bitcoindevkit_bg.wasm');
   },
 });
