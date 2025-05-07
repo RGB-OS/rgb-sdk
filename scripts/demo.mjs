@@ -33,7 +33,7 @@ const asset_id ='rgb:49vaJ7XR-U7flPJB-Lb2l7cq-plK7uFu-ZEfls4!-DTECPAw'
 // const assetBalance = await getAssetBalance(xpub, 'rgb:tV4HWYaf-cL194Ms-wybCrE9-1VDcchJ-lpuMv7Q-5PmlErM');
 // const assetBalance = await listAssets(xpub);
 // console.log('assets', assetBalance);
-wallet.init('tpubD6NzVbkrYhZ4XDHNmegzuvaCFPuehC3G9Y61prY1KLoK51FWtHF65vexwE2BfbFSW23T3BKp8HBCqRJmF7Dxf6twi1R8BqC8C75X1PU8Tkc')
+wallet.init('tpubD6NzVbkrYhZ4XDHNmegzuvaCFPuehC3G9Y61prY1KLoK51FWtHF65vexwE2BfbFSW23T3BKp8HBCqRJmF7Dxf6twi1R8BqC8C75X1PU8Tkc','http://127.0.0.1:8000')
 // const assetBalance = await wallet.listAssets();
 // console.log('assets', JSON.stringify(assetBalance));
 // const balance = await wallet.getBtcBalance();

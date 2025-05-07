@@ -18,8 +18,8 @@ export class WalletManager {
 
   constructor() { }
 
-  public init(xpub: string) {
-    this.sdk = new ThunderLink({ xpub });
+  public init(xpub: string, rgbEndpoint: string) {
+    this.sdk = new ThunderLink({ xpub , rgbEndpoint });
     this.xpub = xpub;
   }
 

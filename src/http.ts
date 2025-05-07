@@ -1,8 +1,8 @@
 import axios, { AxiosError } from "axios";
 
-export const createClient = (xpub: string) => {
+export const createClient = (xpub: string, rgbManagerEndpoint:string) => {
   const client = axios.create({
-    baseURL: "http://127.0.0.1:8000",
+    baseURL: rgbManagerEndpoint,
     headers: {
       "xpub": xpub,
     },
