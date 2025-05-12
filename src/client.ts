@@ -1,12 +1,12 @@
 // src/index.ts
 import { createClient } from "./http";
-import { AssetBalanceResponse, BtcBalance, FailTransfersRequest, InvoiceReciveData, IssueAssetNIAResponse, ListAssetsResponse, RgbTransfer, Unspent } from "./types/rgb-model";
+import { AssetBalanceResponse, BtcBalance, FailTransfersRequest, InvoiceReciveData, IssueAssetNIAResponse, ListAssetsResponse, RgbTransfer, SendAssetBeginRequestModel, SendAssetEndRequestModel, Unspent } from "./types/rgb-model";
 
 export class ThunderLink {
   private client;
 
-  constructor({ xpub,rgbEndpoint }: { xpub: string,rgbEndpoint:string }) {
-    this.client = createClient(xpub,rgbEndpoint);
+  constructor({ xpub, rgbEndpoint }: { xpub: string, rgbEndpoint: string }) {
+    this.client = createClient(xpub, rgbEndpoint);
   }
 
   async registerWallet(): Promise<{ address: string, btc_balance: BtcBalance }> {
@@ -38,16 +38,26 @@ export class ThunderLink {
     return data;
   }
 
+  async sendBegin(params: SendAssetBeginRequestModel): Promise<string> {
+    const { data } = await this.client.post("/wallet/sendbegin", params);
+    return data;
+  }
+
+  async sendEnd(params: SendAssetEndRequestModel): Promise<string> {
+    const { data } = await this.client.post("/wallet/sendend", params);
+    return data;
+  }
+
   async blindRecive(params: { asset_id: string; amount: number }): Promise<InvoiceReciveData> {
     const { data } = await this.client.post("/blindreceive", params);
     return data;
   }
 
-  async getAssetBalance(assetId: string):Promise<AssetBalanceResponse> {
+  async getAssetBalance(assetId: string): Promise<AssetBalanceResponse> {
     const { data } = await this.client.post("/wallet/assetbalance", { assetId });
     return data;
   }
-  async issueAssetNia(params: { ticker: string; name: string, amount: number[]; precision: number; }):Promise<IssueAssetNIAResponse> {
+  async issueAssetNia(params: { ticker: string; name: string, amount: number[]; precision: number; }): Promise<IssueAssetNIAResponse> {
     const { data } = await this.client.post("/wallet/issueassetnia", params);
     return data;
   }

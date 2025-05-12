@@ -2,7 +2,7 @@ import { mnemonicToSeedSync } from 'bip39';
 import init, * as bdk from '../bundles/wasm/bitcoindevkit.js';
 import { Wallet, Network } from '../bundles/wasm/bitcoindevkit.js';
 import { ThunderLink } from './client';
-import { FailTransfersRequest } from './types/rgb-model';
+import { FailTransfersRequest, SendAssetBeginRequestModel, SendAssetEndRequestModel } from './types/rgb-model';
 
 const rgblib = require('rgb-lib');
 const network: Network = 'regtest';
@@ -19,7 +19,7 @@ export class WalletManager {
   constructor() { }
 
   public init(xpub: string, rgbEndpoint: string) {
-    this.sdk = new ThunderLink({ xpub , rgbEndpoint });
+    this.sdk = new ThunderLink({ xpub, rgbEndpoint });
     this.xpub = xpub;
   }
 
@@ -68,6 +68,18 @@ export class WalletManager {
 
   public async createUtxosEnd(params: { signedPsbt: string }) {
     return await this.getSdk().createUtxosEnd(params);
+  }
+  public async sendBegin(params: SendAssetBeginRequestModel) {
+    return await this.getSdk().sendBegin(params);
+  }
+  public async sendEnd(params: SendAssetEndRequestModel) {
+    return await this.getSdk().sendEnd(params);
+  }
+
+  public async send(invoiceTransfer: SendAssetBeginRequestModel, mnenonic: string) {
+    const psbt = await this.sendBegin(invoiceTransfer);
+    const signedPsbt = await this.signPsbt({ psbtBase64: psbt, mnemonic: mnenonic });
+    return await this.sendEnd({ signed_psbt: signedPsbt });
   }
 
   public async blindRecive(params: { asset_id: string; amount: number }) {
