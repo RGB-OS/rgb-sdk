@@ -1,5 +1,5 @@
 {
-  "name": "rgb-connect-nodejs",
+  "name": "@thunderlink/rgb-connect-nodejs",
   "version": "1.0.4",
   "devDependencies": {
     "@types/node": "^22.14.0",
