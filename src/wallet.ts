@@ -4,7 +4,7 @@ import { Wallet, Network } from '../bundles/wasm/bitcoindevkit.js';
 import { ThunderLink } from './client';
 import { FailTransfersRequest, SendAssetBeginRequestModel, SendAssetEndRequestModel } from './types/rgb-model';
 
-const rgblib = require('rgb-lib');
+// const rgblib = require('rgb-lib');
 const network: Network = 'regtest';
 
 interface SignPsbtParams {
@@ -36,7 +36,7 @@ export class WalletManager {
   }
 
   public async createWallet() {
-    return rgblib.generateKeys(rgblib.BitcoinNetwork.Regtest);
+    // return rgblib.generateKeys(rgblib.BitcoinNetwork.Regtest);
   }
 
   public async registerWallet() {
