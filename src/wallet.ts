@@ -2,7 +2,7 @@ import { mnemonicToSeedSync } from 'bip39';
 import init, * as bdk from '../bundles/wasm/bitcoindevkit.js';
 import { Wallet, Network } from '../bundles/wasm/bitcoindevkit.js';
 import { ThunderLink } from './client';
-import { FailTransfersRequest, SendAssetBeginRequestModel, SendAssetEndRequestModel } from './types/rgb-model';
+import { FailTransfersRequest, IssueAssetNiaRequestModel, SendAssetBeginRequestModel, SendAssetEndRequestModel } from './types/rgb-model';
 
 const rgblib = require('rgb-lib');
 const network: Network = 'regtest';
@@ -10,6 +10,10 @@ const network: Network = 'regtest';
 interface SignPsbtParams {
   psbtBase64: string;
   mnemonic: string;
+}
+
+export const createWallet=() => {
+  return rgblib.generateKeys(rgblib.BitcoinNetwork.Regtest);
 }
 
 export class WalletManager {
@@ -33,10 +37,6 @@ export class WalletManager {
       throw new Error('Wallet not initialized. Call `wallet.init(xpub)` first.');
     }
     return this.sdk;
-  }
-
-  public async createWallet() {
-    return rgblib.generateKeys(rgblib.BitcoinNetwork.Regtest);
   }
 
   public async registerWallet() {
@@ -86,7 +86,7 @@ export class WalletManager {
     return await this.getSdk().blindRecive(params);
   }
 
-  public async issueAssetNia(params: { ticker: string; name: string; amount: number[]; precision: number }) {
+  public async issueAssetNia(params: IssueAssetNiaRequestModel) {
     return await this.getSdk().issueAssetNia(params);
   }
 
@@ -115,6 +115,9 @@ export class WalletManager {
   }
   public async failTransfers(params: FailTransfersRequest) {
     return await this.getSdk().failTransfers(params);
+  }
+  public async decodeRGBInvoice(params: { invoice: string }) {
+    return await this.getSdk().decodeRGBInvoice(params);
   }
 }
 

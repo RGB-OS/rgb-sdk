@@ -57,13 +57,17 @@ export class ThunderLink {
     const { data } = await this.client.post("/wallet/assetbalance", { assetId });
     return data;
   }
-  async issueAssetNia(params: { ticker: string; name: string, amount: number[]; precision: number; }): Promise<IssueAssetNIAResponse> {
+  async issueAssetNia(params: { ticker: string; name: string, amounts: number[]; precision: number; }): Promise<IssueAssetNIAResponse> {
     const { data } = await this.client.post("/wallet/issueassetnia", params);
     return data;
   }
 
   async listAssets(): Promise<ListAssetsResponse> {
     const { data } = await this.client.post("/wallet/listassets");
+    return data;
+  }
+  async decodeRGBInvoice(params: { invoice: string }): Promise<SendAssetBeginRequestModel> {
+    const { data } = await this.client.post("/wallet/decodergbinvoice", params);
     return data;
   }
 
@@ -90,4 +94,5 @@ export class ThunderLink {
     const { data } = await this.client.post("/wallet/failtransfers", { batch_transfer_idx, no_asset_only, skip_sync });
     return data;
   }
+
 }

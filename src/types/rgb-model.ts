@@ -15,12 +15,13 @@ export interface Recipient {
   amount: number;
   transport_endpoints: string[];
 }
-
+export interface IssueAssetNiaRequestModel { ticker: string; name: string; amounts: number[]; precision: number }
 export interface SendAssetBeginRequestModel {
-  recipient_map: Record<string, Recipient[]>;
-  donation?: boolean;            // default: false
-  fee_rate?: number;             // default: 1
-  min_confirmations?: number;    // default: 1
+  invoice: string;
+  // recipient_map: Record<string, Recipient[]>;
+  // donation?: boolean;            // default: false
+  // fee_rate?: number;             // default: 1
+  // min_confirmations?: number;    // default: 1
 }
 
 export interface SendAssetEndRequestModel {
@@ -270,4 +271,14 @@ export interface AssetBalanceResponse {
    * @example 0
    */
   offchainInbound?: number;
+}
+
+export interface DecodeRgbInvoiceResponse {
+  recipient_id: string;
+  asset_iface?: string;
+  asset_id?: string;
+  amount?: string;
+  network: string;
+  expiration_timestamp: number;
+  transport_endpoints: string[];
 }

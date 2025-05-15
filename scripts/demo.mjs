@@ -1,6 +1,8 @@
 
 // import { listUnspents, initWallet, createUtxosBegin, signPsbt, createUtxosEnd, getBtcBalance, listAssets, getAssetBalance, generateInvoice } from '../dist/index.js';
-import { wallet } from "../dist/index.cjs";
+import { wallet ,createWallet} from "../dist/index.cjs";
+const keys = createWallet();
+console.log('keys', JSON.stringify(keys));
 // const xpub = 'tpubDCNyfuS6Are75WRm61sf38RKEBbntVbMQyAuTTPAEaVFezU8yPWDreezPf38wxvcLgT3UjH5AsnegrfRniku1HWz9HN2bvCLxxgESeAUqJf'
 // const mnemonic = 'radar plug tell novel deer riot voyage tiny sponsor dumb evolve faculty'
 const mnemonic = 'world flee sword train ready audit wedding opinion boil drift detect total'
@@ -10,28 +12,28 @@ const mnemonic = 'world flee sword train ready audit wedding opinion boil drift 
 // console.log('init', init);
 // const unspents = await listUnspents('tpubD6NzVbkrYhZ4XDHNmegzuvaCFPuehC3G9Y61prY1KLoK51FWtHF65vexwE2BfbFSW23T3BKp8HBCqRJmF7Dxf6twi1R8BqC8C75X1PU8Tkc');
 // console.log('listUnspends', unspents);
-wallet.init('tpubDD9Lx5UmaskH2ksixELAQ22QsVMAVWtHi3eP1QhGhr9vXpwVRfvVwxcaLDigefHNLQv5ee6muxm2Fie3HMuCaRQFPESiHUqWMcSmRzE2ecU','http://127.0.0.1:8000')
+// wallet.init('tpubDD9Lx5UmaskH2ksixELAQ22QsVMAVWtHi3eP1QhGhr9vXpwVRfvVwxcaLDigefHNLQv5ee6muxm2Fie3HMuCaRQFPESiHUqWMcSmRzE2ecU','http://127.0.0.1:8000')
 // const keys = await wallet.createWallet();
 // console.log('keys', JSON.stringify(keys));
 // wallet.init('tpubDCBVqdMruXVpXUzv6ADzEershYBVeKjQYkiUiYpMnz6mpEstjmByTVAChnA3LMzeLRKTPjsdNkH1sL6BwZ5w88Rj8Cn9uorsS7MJPyEZxL9','http://127.0.0.1:8000')
 // const adress = await wallet.getAddress();
 
-const utxos_psbt = await wallet.createUtxosBegin({
-    upTo: false,
-    num: 5,
-    size: 1000,
-    feeRate: 1
-});
-console.log('utxos', utxos_psbt);
-const signedPsbt = await wallet.signPsbt({
-    psbtBase64: utxos_psbt,
-    mnemonic,
-});
-console.log('signedPsbt', signedPsbt);
-const utxosCreated = await wallet.createUtxosEnd({
-    signedPsbt: signedPsbt
-});
-console.log('utxosCreated', utxosCreated);
+// const utxos_psbt = await wallet.createUtxosBegin({
+//     upTo: false,
+//     num: 5,
+//     size: 1000,
+//     feeRate: 1
+// });
+// console.log('utxos', utxos_psbt);
+// const signedPsbt = await wallet.signPsbt({
+//     psbtBase64: utxos_psbt,
+//     mnemonic,
+// });
+// console.log('signedPsbt', signedPsbt);
+// const utxosCreated = await wallet.createUtxosEnd({
+//     signedPsbt: signedPsbt
+// });
+// console.log('utxosCreated', utxosCreated);
 // const balance = await getBtcBalance(xpub);
 // console.log('balance', balance);
 // const assetBalance = await getAssetBalance(xpub, 'rgb:tV4HWYaf-cL194Ms-wybCrE9-1VDcchJ-lpuMv7Q-5PmlErM');
