@@ -5,7 +5,7 @@ const keys = createWallet();
 console.log('keys', JSON.stringify(keys));
 // const xpub = 'tpubDCNyfuS6Are75WRm61sf38RKEBbntVbMQyAuTTPAEaVFezU8yPWDreezPf38wxvcLgT3UjH5AsnegrfRniku1HWz9HN2bvCLxxgESeAUqJf'
 // const mnemonic = 'radar plug tell novel deer riot voyage tiny sponsor dumb evolve faculty'
-const mnemonic = 'world flee sword train ready audit wedding opinion boil drift detect total'
+// const mnemonic = 'world flee sword train ready audit wedding opinion boil drift detect total'
 // const mnemonic='melody fee hero onion rapid bullet again exile exact exile slogan grace'
 // const asset_id ='rgb:49vaJ7XR-U7flPJB-Lb2l7cq-plK7uFu-ZEfls4!-DTECPAw'
 // const init = await init(xpub);
@@ -54,8 +54,8 @@ const mnemonic = 'world flee sword train ready audit wedding opinion boil drift 
 
 // const listTransactionsafter = await wallet.listAssets();
 // console.log('------listTransactionsafter', JSON.stringify(listTransactionsafter));
-const listUnspents = await wallet.listUnspents();
-console.log('------listUnspents', JSON.stringify(listUnspents));
+// const listUnspents = await wallet.listUnspents();
+// console.log('------listUnspents', JSON.stringify(listUnspents));
 // const invoice = await wallet.generateInvoice({amount: 100, asset_id});
 
 // console.log('--------invoice', invoice);

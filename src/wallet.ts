@@ -1,6 +1,6 @@
 import { mnemonicToSeedSync } from 'bip39';
 import init, * as bdk from '../bundles/wasm/bitcoindevkit.js';
-import { Wallet, Network } from '../bundles/wasm/bitcoindevkit.js';
+import { Wallet, Network, KeychainKind } from '../bundles/wasm/bitcoindevkit.js';
 import { ThunderLink } from './client';
 import { FailTransfersRequest, IssueAssetNiaRequestModel, SendAssetBeginRequestModel, SendAssetEndRequestModel } from './types/rgb-model';
 
@@ -12,17 +12,22 @@ interface SignPsbtParams {
   mnemonic: string;
 }
 
-export const createWallet=() => {
+export const createWallet = () => {
   return rgblib.generateKeys(rgblib.BitcoinNetwork.Regtest);
 }
 
 export class WalletManager {
   private sdk: ThunderLink | null = null;
   private xpub: string | null = null;
+  private wallet: Wallet | null = null;
+  private descriptors: { external: string; internal: string } | null = null;
 
   constructor() { }
 
-  public init(xpub: string, rgbEndpoint: string) {
+  public init(xpub: string, rgbEndpoint: string, mnemonic: string) {
+    const seed = mnemonicToSeedSync(mnemonic);
+    this.descriptors = bdk.seed_to_descriptor(seed, network, 'p2tr');
+    this.wallet = Wallet.create(network, this.descriptors.external, this.descriptors.internal);
     this.sdk = new ThunderLink({ xpub, rgbEndpoint });
     this.xpub = xpub;
   }
@@ -91,12 +96,21 @@ export class WalletManager {
   }
 
   public async signPsbt({ psbtBase64, mnemonic }: SignPsbtParams) {
-    const seed = mnemonicToSeedSync(mnemonic);
-    const descriptors = bdk.seed_to_descriptor(seed, network, 'p2tr');
-    const wallet = Wallet.create(network, descriptors.external, descriptors.internal);
+    if (!this.wallet) {
+      throw new Error('Wallet not initialized');
+    }
 
     const pstb = bdk.Psbt.from_string(psbtBase64);
-    const isSigned = wallet.sign(pstb);
+    console.log('external:', this.descriptors?.external);
+    console.log('internal:', this.descriptors?.internal);
+    // console.log('Wallet fingerprint:', this.wallet.sign(pstb));
+    // Get first receive address
+    const addr = this.wallet.peek_address('external', 0);
+    console.log('Receive address (index 0):', addr.address.toString());
+
+    console.log('pstb', pstb.to_json());
+    const isSigned = this.wallet.sign(pstb);
+    // const isSigned = false;
 
     if (!isSigned) {
       throw new Error('Failed to sign PSBT');
