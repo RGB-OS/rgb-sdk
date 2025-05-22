@@ -100,23 +100,18 @@ export class WalletManager {
       throw new Error('Wallet not initialized');
     }
 
-    const pstb = bdk.Psbt.from_string(psbtBase64);
-    console.log('external:', this.descriptors?.external);
-    console.log('internal:', this.descriptors?.internal);
-    // console.log('Wallet fingerprint:', this.wallet.sign(pstb));
-    // Get first receive address
-    const addr = this.wallet.peek_address('external', 0);
-    console.log('Receive address (index 0):', addr.address.toString());
-
-    console.log('pstb', pstb.to_json());
-    const isSigned = this.wallet.sign(pstb);
-    // const isSigned = false;
-
-    if (!isSigned) {
-      throw new Error('Failed to sign PSBT');
-    }
-
-    return pstb.toString();
+    let walletData = {
+      dataDir: "./data",
+      bitcoinNetwork: rgblib.BitcoinNetwork.Regtest,
+      databaseType: rgblib.DatabaseType.Sqlite,
+      maxAllocationsPerUtxo: "1",
+      pubkey: this.xpub,
+      mnemonic: mnemonic,
+      vanillaKeychain: "1",
+    };
+    let rgbWallet = new rgblib.Wallet(new rgblib.WalletData(walletData));
+    const signed = rgbWallet.signPsbt(psbtBase64)
+    return signed;
   }
   public async refreshWallet() {
     return await this.getSdk().refreshWallet();

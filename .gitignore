@@ -1,5 +1,5 @@
 bdk-wasm/
-data/
+data/*
 node_modules/
 package-lock.json
 .env
