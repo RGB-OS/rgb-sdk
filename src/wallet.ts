@@ -3,6 +3,8 @@ import init, * as bdk from '../bundles/wasm/bitcoindevkit.js';
 import { Wallet, Network, KeychainKind } from '../bundles/wasm/bitcoindevkit.js';
 import { ThunderLink } from './client';
 import { FailTransfersRequest, IssueAssetNiaRequestModel, SendAssetBeginRequestModel, SendAssetEndRequestModel } from './types/rgb-model';
+import fs from 'fs';
+import path from 'path';
 
 const rgblib = require('rgb-lib');
 const network: Network = 'regtest';
@@ -99,9 +101,19 @@ export class WalletManager {
     if (!this.wallet) {
       throw new Error('Wallet not initialized');
     }
+    // Resolve the data directory path
+    const projectRoot = path.resolve(__dirname, '..');  // adjust as needed
+
+    const dataDir = path.join(projectRoot, 'data');
+    
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    
+    console.log('Data directory:', dataDir);
 
     let walletData = {
-      dataDir: "./data",
+      dataDir: dataDir,
       bitcoinNetwork: rgblib.BitcoinNetwork.Regtest,
       databaseType: rgblib.DatabaseType.Sqlite,
       maxAllocationsPerUtxo: "1",
