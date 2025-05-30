@@ -39,7 +39,7 @@
     "bitcoinjs-lib": "^6.1.7",
     "ecpair": "^3.0.0",
     "os": "^0.1.2",
-    "rgb-lib": "npm:thunderlink-rgb-lib@0.3.0-alpha.12.1",
+    "rgb-lib": "npm:thunderlink-rgb-lib@0.3.0-alpha.13",
     "tiny-secp256k1": "^2.2.3"
   },
   "optionalDependencies": {
