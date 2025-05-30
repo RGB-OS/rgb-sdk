@@ -1,10 +1,11 @@
 import axios, { AxiosError } from "axios";
 
-export const createClient = (xpub: string, rgbManagerEndpoint:string) => {
+export const createClient = (xpub_van: string,xpub_col:string, rgbManagerEndpoint:string) => {
   const client = axios.create({
     baseURL: rgbManagerEndpoint,
     headers: {
-      "xpub": xpub,
+      "xpub-van": xpub_van,
+      "xpub-col":xpub_col,
     },
   });
   client.interceptors.response.use(
