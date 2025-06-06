@@ -5,8 +5,8 @@ import { AssetBalanceResponse, BtcBalance, FailTransfersRequest, InvoiceReciveDa
 export class ThunderLink {
   private client;
 
-  constructor({ xpub, rgbEndpoint }: { xpub: string, rgbEndpoint: string }) {
-    this.client = createClient(xpub, rgbEndpoint);
+  constructor({ xpub_van,xpub_col, rgbEndpoint }: { xpub_van: string,xpub_col: string, rgbEndpoint: string }) {
+    this.client = createClient(xpub_van,xpub_col, rgbEndpoint);
   }
 
   async registerWallet(): Promise<{ address: string, btc_balance: BtcBalance }> {

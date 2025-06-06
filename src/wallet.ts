@@ -20,23 +20,25 @@ export const createWallet = () => {
 
 export class WalletManager {
   private sdk: ThunderLink | null = null;
-  private xpub: string | null = null;
+  private xpub_van: string | null = null;
+  private xpub_col: string | null = null;
   private wallet: Wallet | null = null;
   private descriptors: { external: string; internal: string } | null = null;
 
   constructor() { }
 
-  public init(xpub: string, rgbEndpoint: string, mnemonic: string) {
+  public init(xpub_van: string, xpub_col: string, rgbEndpoint: string, mnemonic: string) {
     const seed = mnemonicToSeedSync(mnemonic);
     this.descriptors = bdk.seed_to_descriptor(seed, network, 'p2tr');
     this.wallet = Wallet.create(network, this.descriptors.external, this.descriptors.internal);
-    this.sdk = new ThunderLink({ xpub, rgbEndpoint });
-    this.xpub = xpub;
+    this.sdk = new ThunderLink({ xpub_van, xpub_col, rgbEndpoint });
+    this.xpub_van = xpub_van;
+    this.xpub_col = xpub_col;
   }
 
-  public getXpub(): string {
-    if (!this.xpub) throw new Error('Wallet not initialized');
-    return this.xpub;
+  public getXpub(): { xpub_van: string, xpub_col: string } {
+    if (!this.xpub_col || !this.xpub_van) throw new Error('Wallet not initialized');
+    return { xpub_van: this.xpub_van, xpub_col: this.xpub_col };
   }
 
   private getSdk(): ThunderLink {
@@ -105,11 +107,11 @@ export class WalletManager {
     const projectRoot = path.resolve(__dirname, '..');  // adjust as needed
 
     const dataDir = path.join(projectRoot, 'data');
-    
+
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
-    
+
     console.log('Data directory:', dataDir);
 
     let walletData = {
@@ -117,7 +119,8 @@ export class WalletManager {
       bitcoinNetwork: rgblib.BitcoinNetwork.Regtest,
       databaseType: rgblib.DatabaseType.Sqlite,
       maxAllocationsPerUtxo: "1",
-      pubkey: this.xpub,
+      accountXpubVanilla: this.xpub_van,
+      accountXpubColored: this.xpub_col,
       mnemonic: mnemonic,
       vanillaKeychain: "1",
     };
