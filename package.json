@@ -1,6 +1,6 @@
 {
   "name": "rgb-connect-nodejs",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "devDependencies": {
     "@types/node": "^22.14.0",
     "tsup": "^8.4.0",
