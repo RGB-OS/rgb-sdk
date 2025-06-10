@@ -1,39 +1,41 @@
-import { mnemonicToSeedSync } from 'bip39';
-import init, * as bdk from '../bundles/wasm/bitcoindevkit.js';
-import { Wallet, Network, KeychainKind } from '../bundles/wasm/bitcoindevkit.js';
 import { ThunderLink } from './client';
 import { FailTransfersRequest, IssueAssetNiaRequestModel, SendAssetBeginRequestModel, SendAssetEndRequestModel } from './types/rgb-model';
 import fs from 'fs';
 import path from 'path';
 
 const rgblib = require('rgb-lib');
-const network: Network = 'regtest';
 
 interface SignPsbtParams {
-  psbtBase64: string;
-  mnemonic: string;
+  psbt: string;
+  mnemonic?: string;
 }
 
 export const createWallet = () => {
   return rgblib.generateKeys(rgblib.BitcoinNetwork.Regtest);
 }
 
+type InitSDKParams = {
+  xpub_van: string;
+  xpub_col: string;
+  rgbEndpoint?: string;
+  mnemonic?: string;
+}
+
 export class WalletManager {
   private sdk: ThunderLink | null = null;
   private xpub_van: string | null = null;
   private xpub_col: string | null = null;
-  private wallet: Wallet | null = null;
-  private descriptors: { external: string; internal: string } | null = null;
+  private mnemonic: string | null = null;
 
   constructor() { }
 
-  public init(xpub_van: string, xpub_col: string, rgbEndpoint: string, mnemonic: string) {
-    const seed = mnemonicToSeedSync(mnemonic);
-    this.descriptors = bdk.seed_to_descriptor(seed, network, 'p2tr');
-    this.wallet = Wallet.create(network, this.descriptors.external, this.descriptors.internal);
-    this.sdk = new ThunderLink({ xpub_van, xpub_col, rgbEndpoint });
+  public init({ xpub_van, xpub_col, rgbEndpoint, mnemonic }: InitSDKParams) {
+    if (rgbEndpoint) {
+      this.sdk = new ThunderLink({ xpub_van, xpub_col, rgbEndpoint });
+    }
     this.xpub_van = xpub_van;
     this.xpub_col = xpub_col;
+    this.mnemonic = mnemonic ?? null;
   }
 
   public getXpub(): { xpub_van: string, xpub_col: string } {
@@ -85,9 +87,9 @@ export class WalletManager {
     return await this.getSdk().sendEnd(params);
   }
 
-  public async send(invoiceTransfer: SendAssetBeginRequestModel, mnenonic: string) {
+  public async send(invoiceTransfer: SendAssetBeginRequestModel, mnenonic?: string) {
     const psbt = await this.sendBegin(invoiceTransfer);
-    const signedPsbt = await this.signPsbt({ psbtBase64: psbt, mnemonic: mnenonic });
+    const signedPsbt = await this.signPsbt(psbt, mnenonic);
     return await this.sendEnd({ signed_psbt: signedPsbt });
   }
 
@@ -99,10 +101,8 @@ export class WalletManager {
     return await this.getSdk().issueAssetNia(params);
   }
 
-  public async signPsbt({ psbtBase64, mnemonic }: SignPsbtParams) {
-    if (!this.wallet) {
-      throw new Error('Wallet not initialized');
-    }
+  public async signPsbt(psbt: string, mnemonic?: string): Promise<string> {
+
     // Resolve the data directory path
     const projectRoot = path.resolve(__dirname, '..');  // adjust as needed
 
@@ -121,11 +121,11 @@ export class WalletManager {
       maxAllocationsPerUtxo: "1",
       accountXpubVanilla: this.xpub_van,
       accountXpubColored: this.xpub_col,
-      mnemonic: mnemonic,
+      mnemonic: mnemonic ?? this.mnemonic,
       vanillaKeychain: "1",
     };
     let rgbWallet = new rgblib.Wallet(new rgblib.WalletData(walletData));
-    const signed = rgbWallet.signPsbt(psbtBase64)
+    const signed = rgbWallet.signPsbt(psbt)
     return signed;
   }
   public async refreshWallet() {

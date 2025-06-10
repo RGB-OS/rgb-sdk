@@ -7,7 +7,4 @@ export default defineConfig({
   target: 'node18',
   dts: true,
   outExtension: () => ({ js: '.cjs' }),
-  onSuccess: async () => {
-    copyFileSync('bundles/wasm/bitcoindevkit_bg.wasm', 'dist/bitcoindevkit_bg.wasm');
-  },
 });
