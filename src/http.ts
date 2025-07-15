@@ -1,11 +1,15 @@
 import axios, { AxiosError } from "axios";
+import { RGBHTTPClientParams } from "./types/rgb-model";
 
-export const createClient = (xpub_van: string,xpub_col:string, rgbManagerEndpoint:string) => {
+export const createClient = (params: RGBHTTPClientParams) => {
+
+  const { xpub_van, xpub_col, rgbEndpoint, master_fingerprint } = params;
   const client = axios.create({
-    baseURL: rgbManagerEndpoint,
+    baseURL: rgbEndpoint,
     headers: {
       "xpub-van": xpub_van,
-      "xpub-col":xpub_col,
+      "xpub-col": xpub_col,
+      "master-fingerprint": master_fingerprint
     },
   });
   client.interceptors.response.use(

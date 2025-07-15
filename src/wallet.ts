@@ -19,6 +19,8 @@ type InitSDKParams = {
   xpub_col: string;
   rgbEndpoint?: string;
   mnemonic?: string;
+  network?: number;
+  master_fingerprint: string;
 }
 
 export class WalletManager {
@@ -26,16 +28,18 @@ export class WalletManager {
   private xpub_van: string | null = null;
   private xpub_col: string | null = null;
   private mnemonic: string | null = null;
+  private network: number = 3;
 
   constructor() { }
 
-  public init({ xpub_van, xpub_col, rgbEndpoint, mnemonic }: InitSDKParams) {
+  public init({ xpub_van, xpub_col, rgbEndpoint, mnemonic, network, master_fingerprint }: InitSDKParams) {
     if (rgbEndpoint) {
-      this.sdk = new ThunderLink({ xpub_van, xpub_col, rgbEndpoint });
+      this.sdk = new ThunderLink({ xpub_van, xpub_col, rgbEndpoint, master_fingerprint });
     }
     this.xpub_van = xpub_van;
     this.xpub_col = xpub_col;
     this.mnemonic = mnemonic ?? null;
+    this.network = network ?? 3 // set Regtest as default
   }
 
   public getXpub(): { xpub_van: string, xpub_col: string } {
@@ -116,7 +120,7 @@ export class WalletManager {
 
     let walletData = {
       dataDir: dataDir,
-      bitcoinNetwork: rgblib.BitcoinNetwork.Regtest,
+      bitcoinNetwork: this.network,
       databaseType: rgblib.DatabaseType.Sqlite,
       maxAllocationsPerUtxo: "1",
       accountXpubVanilla: this.xpub_van,

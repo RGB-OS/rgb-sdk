@@ -1,4 +1,11 @@
 
+export type RGBHTTPClientParams ={ 
+  xpub_van: string,
+  xpub_col: string, 
+  master_fingerprint:string,
+  rgbEndpoint: string, 
+}
+
 export interface FailTransfersRequest {
   batch_transfer_idx: number
   no_asset_only?: boolean

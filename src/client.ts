@@ -1,12 +1,13 @@
 // src/index.ts
 import { createClient } from "./http";
-import { AssetBalanceResponse, BtcBalance, FailTransfersRequest, InvoiceReciveData, IssueAssetNIAResponse, ListAssetsResponse, RgbTransfer, SendAssetBeginRequestModel, SendAssetEndRequestModel, Unspent } from "./types/rgb-model";
+import { AssetBalanceResponse, BtcBalance, FailTransfersRequest, InvoiceReciveData, IssueAssetNIAResponse, ListAssetsResponse, RGBHTTPClientParams, RgbTransfer, SendAssetBeginRequestModel, SendAssetEndRequestModel, Unspent } from "./types/rgb-model";
+
 
 export class ThunderLink {
   private client;
 
-  constructor({ xpub_van,xpub_col, rgbEndpoint }: { xpub_van: string,xpub_col: string, rgbEndpoint: string }) {
-    this.client = createClient(xpub_van,xpub_col, rgbEndpoint);
+  constructor(params: RGBHTTPClientParams) {
+    this.client = createClient(params);
   }
 
   async registerWallet(): Promise<{ address: string, btc_balance: BtcBalance }> {
