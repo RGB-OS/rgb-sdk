@@ -10,6 +10,7 @@ interface SignPsbtParams {
   mnemonic?: string;
 }
 
+
 export const createWallet = () => {
   return rgblib.generateKeys(rgblib.BitcoinNetwork.Regtest);
 }
@@ -29,6 +30,7 @@ export class WalletManager {
   private xpub_col: string | null = null;
   private mnemonic: string | null = null;
   private network: string = '3';
+  private master_fingerprint: string;
 
   constructor() { }
 
@@ -40,6 +42,7 @@ export class WalletManager {
     this.xpub_col = xpub_col;
     this.mnemonic = mnemonic ?? null;
     this.network = network ?? '3' // set Regtest as default
+    this.master_fingerprint = master_fingerprint
   }
 
   public getXpub(): { xpub_van: string, xpub_col: string } {
@@ -126,6 +129,7 @@ export class WalletManager {
       accountXpubVanilla: this.xpub_van,
       accountXpubColored: this.xpub_col,
       mnemonic: mnemonic ?? this.mnemonic,
+      masterFingerprint:this.master_fingerprint,
       vanillaKeychain: "1",
     };
     let rgbWallet = new rgblib.Wallet(new rgblib.WalletData(walletData));
