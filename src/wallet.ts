@@ -19,7 +19,7 @@ type InitSDKParams = {
   xpub_col: string;
   rgbEndpoint?: string;
   mnemonic?: string;
-  network?: number;
+  network?: string;
   master_fingerprint: string;
 }
 
@@ -28,7 +28,7 @@ export class WalletManager {
   private xpub_van: string | null = null;
   private xpub_col: string | null = null;
   private mnemonic: string | null = null;
-  private network: number = 3;
+  private network: string = '3';
 
   constructor() { }
 
@@ -39,7 +39,7 @@ export class WalletManager {
     this.xpub_van = xpub_van;
     this.xpub_col = xpub_col;
     this.mnemonic = mnemonic ?? null;
-    this.network = network ?? 3 // set Regtest as default
+    this.network = network ?? '3' // set Regtest as default
   }
 
   public getXpub(): { xpub_van: string, xpub_col: string } {
