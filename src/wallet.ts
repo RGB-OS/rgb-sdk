@@ -30,7 +30,7 @@ export class WalletManager {
   private xpub_col: string | null = null;
   private mnemonic: string | null = null;
   private network: string = '3';
-  private master_fingerprint: string;
+  private master_fingerprint: string='';
 
   constructor() { }
 
