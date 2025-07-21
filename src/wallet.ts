@@ -1,5 +1,5 @@
 import { ThunderLink } from './client';
-import { FailTransfersRequest, IssueAssetNiaRequestModel, SendAssetBeginRequestModel, SendAssetEndRequestModel } from './types/rgb-model';
+import { AssetSchema, FailTransfersRequest, IssueAssetNiaRequestModel, SendAssetBeginRequestModel, SendAssetEndRequestModel } from './types/rgb-model';
 import fs from 'fs';
 import path from 'path';
 
@@ -130,6 +130,7 @@ export class WalletManager {
       accountXpubColored: this.xpub_col,
       mnemonic: mnemonic ?? this.mnemonic,
       masterFingerprint:this.master_fingerprint,
+      supportedSchemas:[AssetSchema.Nia,AssetSchema.Uda,AssetSchema.Cfa],
       vanillaKeychain: "1",
     };
     let rgbWallet = new rgblib.Wallet(new rgblib.WalletData(walletData));
