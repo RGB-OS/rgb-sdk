@@ -15,7 +15,10 @@ export interface WitnessData {
   amount_sat: number;
   blinding?: number;
 }
-
+export interface InvoiceRequest {
+  amount: number;
+  asset_id: string;
+}
 export interface Recipient {
   recipient_id: string;
   witness_data?: WitnessData;
@@ -25,10 +28,11 @@ export interface Recipient {
 export interface IssueAssetNiaRequestModel { ticker: string; name: string; amounts: number[]; precision: number }
 export interface SendAssetBeginRequestModel {
   invoice: string;
+  witness_data?: WitnessData;
   // recipient_map: Record<string, Recipient[]>;
   // donation?: boolean;            // default: false
-  // fee_rate?: number;             // default: 1
-  // min_confirmations?: number;    // default: 1
+  fee_rate?: number;             // default: 1
+  min_confirmations?: number;    // default: 1
 }
 
 export interface SendAssetEndRequestModel {

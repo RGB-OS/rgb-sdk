@@ -1,16 +1,47 @@
 const { default: axios } = require("axios");
+// import { AssetSchema, FailTransfersRequest, IssueAssetNiaRequestModel, SendAssetBeginRequestModel, SendAssetEndRequestModel } from './types/rgb-model';
 const { execSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
+const { performance } = require("perf_hooks");
+async function measureListTransfersParallel(wallet, assetId) {
+    const startTotal = performance.now();
+
+    // Start all 3 calls in parallel
+    const startTimes = [performance.now(), performance.now(), performance.now()];
+    const promises = [
+        (async () => {
+            const res = wallet.listTransfers(assetId);
+            console.log(`Call 1 done in ${(performance.now() - startTimes[0]).toFixed(2)} ms`);
+            return res;
+        })(),
+        (async () => {
+            const res = wallet.listTransfers(assetId);
+            console.log(`Call 2 done in ${(performance.now() - startTimes[1]).toFixed(2)} ms`);
+            return res;
+        })(),
+        (async () => {
+            const res = wallet.listTransfers(assetId);
+            console.log(`Call 3 done in ${(performance.now() - startTimes[2]).toFixed(2)} ms`);
+            return res;
+        })()
+    ];
+
+    const results = await Promise.all(promises);
+
+    console.log(`All 3 calls completed in ${(performance.now() - startTotal).toFixed(2)} ms`);
+    return results;
+}
+
 // const PROXY_BASE = 'rpc://regtest.thunderstack.org:50001'
-const ELECTRUM_URL = 'tcp://regtest.thunderstack.org:50001'
-const PROXY_URL = "rpc://regtest.thunderstack.org:3000/json-rpc"
+const ELECTRUM_URL = 'ssl://electrum.iriswallet.com:50003'
+const PROXY_URL = "rpcs://proxy.iriswallet.com/0.2/json-rpc"
 
 const rgblib = require('rgb-lib');
 async function mine(numBlocks) {
     try {
         await axios.post('http://18.119.98.232:5000/execute', {
-            args:`mine ${numBlocks}`,
+            args: `mine ${numBlocks}`,
         });
         console.log("Mined " + numBlocks + " blocks");
     } catch (e) {
@@ -21,7 +52,7 @@ async function mine(numBlocks) {
 async function sendToAddress(address, amt) {
     try {
         await axios.post('http://18.119.98.232:5000/execute', {
-            args:`sendtoaddress ${address} ${amt}`,
+            args: `sendtoaddress ${address} ${amt}`,
         });
         console.log("Sent, TXID: ");
     } catch (e) {
@@ -39,172 +70,106 @@ function checkMemoryLeak() {
 }
 
 async function initWallet(vanillaKeychain) {
-    let bitcoinNetwork = rgblib.BitcoinNetwork.Regtest;
+    // let bitcoinNetwork = rgblib.BitcoinNetwork.Regtest;
+    let bitcoinNetwork = rgblib.BitcoinNetwork.Mainnet;
     // let keys = rgblib.generateKeys(bitcoinNetwork);
     // console.log("Keys: " + JSON.stringify(keys));
-    let keys = {
-        accountXpub: "tpubDCNyfuS6Are75WRm61sf38RKEBbntVbMQyAuTTPAEaVFezU8yPWDreezPf38wxvcLgT3UjH5AsnegrfRniku1HWz9HN2bvCLxxgESeAUqJf",
-        mnemonic: "melody fee hero onion rapid bullet again exile exact exile slogan grace",
-    };
 
-    let restoredKeys = rgblib.restoreKeys(bitcoinNetwork, keys.mnemonic);
+    let restoreDir = "./data/restored";
+    // backup
+
+    // fs.rmdir(restoreDir, (_err) => { });
+    // rgblib.restoreBackup(backupPath, backupPass, restoreDir);
+
+    // let restoredKeys = rgblib.restoreKeys(bitcoinNetwork, keys.mnemonic);
     // console.log("Restored keys: " + JSON.stringify(restoredKeys));
-
+  
     let walletData = {
-        dataDir: "./data",
+        dataDir: restoreDir,
         bitcoinNetwork: bitcoinNetwork,
         databaseType: rgblib.DatabaseType.Sqlite,
         maxAllocationsPerUtxo: "1",
-        pubkey: keys.accountXpub,
-        mnemonic: keys.mnemonic,
-        vanillaKeychain: vanillaKeychain,
+        accountXpubVanilla: keys.account_xpub_vanilla,
+        accountXpubColored: keys.account_xpub_colored,
+        mnemonic: null,
+        masterFingerprint: keys.master_fingerprint,
+        supportedSchemas: [
+            rgblib.AssetSchema.Cfa,
+            rgblib.AssetSchema.Nia,
+            rgblib.AssetSchema.Uda,
+        ],
+        vanillaKeychain: "1",
     };
+
     console.log("Creating wallet...");
+    let start = Date.now();
     let wallet = new rgblib.Wallet(new rgblib.WalletData(walletData));
-    console.log("Wallet created");
+    console.log(`Wallet created in ${Date.now() - start} ms`);
 
-    let btcBalance = wallet.getBtcBalance(null, true);
-    console.log("BTC balance: " + JSON.stringify(btcBalance));
-
+    start = Date.now();
     let address = wallet.getAddress();
-    console.log("Address: " + address);
-
-    // await sendToAddress(address, 1);
-    // await mine(30);
+    console.log(`Address fetched in ${Date.now() - start} ms: ${address}`);
 
     console.log("Wallet is going online...");
-    let online = wallet.goOnline(false, ELECTRUM_URL);
-    console.log("Wallet went online");
+    start = Date.now();
 
+    let online = wallet.goOnline(false, ELECTRUM_URL);
+    console.log(`Wallet went online in ${Date.now() - start} ms`);
+
+    start = Date.now();
     btcBalance = wallet.getBtcBalance(online, false);
-    console.log("BTC balance: " + JSON.stringify(btcBalance));
+    console.log(`BTC balance fetched in ${Date.now() - start} ms: ${JSON.stringify(btcBalance)}`);
 
     // let created = wallet.createUtxos(online, false, "25", null, "1", false);
     // console.log("Created " + JSON.stringify(created) + " UTXOs");
-
+    wallet.sync(online);
     return [wallet, online, walletData];
 }
 
-async function  main() {
+async function main() {
     let [wallet, online, walletData] = await initWallet(null);
-
-    // let asset1 = wallet.issueAssetNIA(online, "USDT", "Tether", "2", [
-    //     "777",
-    //     "66",
-    // ]);
-    // console.log("Issued a NIA asset " + JSON.stringify(asset1));
-
-    let assets1 = wallet.listAssets([
+    let assetId = "";
+    let recipientId = ''
+    start = Date.now();
+    let assets = wallet.listAssets([
         rgblib.AssetSchema.Nia,
     ]);
-    await mine(50);
-    console.log("Assets: " + JSON.stringify(assets1));
-    wallet.sync(online);
-    // let [rcvWallet, rcvOnline, _rcvWalletData] = await initWallet(null);
+    // console.log(`list assets : ${JSON.stringify(assets)}`);
+    console.log(`listAssets in ${Date.now() - start} ms`);
 
-    // let receiveData1 = rcvWallet.blindReceive(
-    //     null,
-    //     "100",
-    //     null,
-    //     [PROXY_URL],
-    //     "1",
-    // );
-    // console.log("Receive data: " + JSON.stringify(receiveData1));
 
-    // let receiveData2 = rcvWallet.witnessReceive(
-    //     null,
-    //     "50",
-    //     "60",
-    //     [PROXY_URL],
-    //     "1",
-    // );
-    // console.log("Receive data: " + JSON.stringify(receiveData2));
+    let receiveData2 = wallet.witnessReceive(
+        null,
+        '{"Fungible":50}',
+        "60",
+        [PROXY_URL],
+        "1",
+    );
+    let recipientMap = {
+        [asset2.assetId]: [
+            {
+                recipientId: receiveData2.recipientId,
+                witnessData: {
+                    amountSat: "1500",
+                    blinding: null,
+                },
+                assignment: { Fungible: 50 },
+                transportEndpoints: [PROXY_URL],
+            },
+        ],
+    };
 
-    // let recipientMap = {
-    //     [asset1.assetId]: [
-    //         {
-    //             recipientId: receiveData1.recipientId,
-    //             witnessData: null,
-    //             amount: "100",
-    //             transportEndpoints: [PROXY_URL],
-    //         },
-    //     ],
-    // };
+    // let sendResult = wallet.sendbe(online, recipientMap, false, "2", "1", false);
 
-    // let sendResult = wallet.send(online, recipientMap, false, "2", "1", false);
-    // console.log("Sent: " + JSON.stringify(sendResult));
-
-    // rcvWallet.refresh(rcvOnline, null, [], false);
-    // wallet.refresh(online, null, [], false);
-
-    // await mine(50);
-
-    // rcvWallet.refresh(rcvOnline, null, [], false);
-    // wallet.refresh(online, null, [], false);
-
-    // let rcvAssets = rcvWallet.listAssets([]);
-    // console.log("Assets: " + JSON.stringify(rcvAssets));
-
-    // let rcvAssetBalance = rcvWallet.getAssetBalance(asset1.assetId);
-    // console.log("Asset balance: " + JSON.stringify(rcvAssetBalance));
-
-    // wallet.sync(online);
-
-    // let transfers = wallet.listTransfers(asset1.assetId);
-    // console.log("Transfers: " + JSON.stringify(transfers));
-
-    // let transactions = wallet.listTransactions(online, true);
-    // console.log("Transactions: " + JSON.stringify(transactions));
-
-    // let unspents = rcvWallet.listUnspents(rcvOnline, false, false);
-    // console.log("Unspents: " + JSON.stringify(unspents));
-
-    // try {
-    //     let feeEstimation = wallet.getFeeEstimation(online, "7");
-    //     console.log("Fee estimation: " + JSON.stringify(feeEstimation));
-    // } catch (e) {
-    //     console.log("Error getting fee estimation: " + e);
-    // }
-
-    // let txid = wallet.sendBtc(
-    //     online,
-    //     rcvWallet.getAddress(),
-    //     "700",
-    //     "3",
-    //     false,
-    // );
-    // console.log("Sent BTC, txid: " + txid);
-
-    // // backup
-    // let backupPath = "./data/backup.rgb-lib";
-    // let backupPass = "password";
-    // fs.unlink(backupPath, (_err) => {});
-    // console.log("Performing backup...");
-    // wallet.backup(backupPath, backupPass);
-
-    // drop existing wallets and avoid memory leaks
-    // console.log("Dropping wallets...");
-    // rgblib.dropOnline(online);
-    // wallet.drop();
-    // rgblib.dropOnline(rcvOnline);
-    // rcvWallet.drop();
-
-    // // restore
-    // console.log("Restoring backup...");
-    // let restoreDir = "./data/restored";
-    // fs.rmdir(restoreDir, (_err) => {});
-    // rgblib.restoreBackup(backupPath, backupPass, restoreDir);
-
-    // // check restored wallet
-    // console.log("Instantiating restored wallet...");
-    // walletData.dataDir = restoreDir;
-    // wallet = new rgblib.Wallet(new rgblib.WalletData(walletData));
-    // online = wallet.goOnline(false, ELECTRUM_URL);
-    // assets2 = wallet.listAssets([]);
-    // console.log("Assets: " + JSON.stringify(assets2));
-
-    // // these avoid memory leaks, unnecessary here since the program exits
-    // console.log("Dropping wallets...");
+    start = Date.now();
+    let transfers1 = wallet.listTransfers(assetId);
+    console.log(`single listTransfers for ${assetId} in ${Date.now() - start} ms`);
+    console.log(`single listTransfers for ${assetId} in ${Date.now() - start} ms`);
+    const transfers = await measureListTransfersParallel(wallet, assetId);
+    // console.log(`Transfers for asset ${assetId}: ${JSON.stringify(transfers)}`);
+    console.log(`listTransfers for ${assetId} in ${Date.now() - start} ms`);
+   
+    console.log("Dropping wallets...");
     rgblib.dropOnline(online);
     wallet.drop();
 }

@@ -1,5 +1,5 @@
 import { ThunderLink } from './client';
-import { AssetSchema, FailTransfersRequest, IssueAssetNiaRequestModel, SendAssetBeginRequestModel, SendAssetEndRequestModel } from './types/rgb-model';
+import { AssetSchema, FailTransfersRequest, InvoiceRequest, IssueAssetNiaRequestModel, SendAssetBeginRequestModel, SendAssetEndRequestModel } from './types/rgb-model';
 import fs from 'fs';
 import path from 'path';
 
@@ -100,8 +100,12 @@ export class WalletManager {
     return await this.sendEnd({ signed_psbt: signedPsbt });
   }
 
-  public async blindRecive(params: { asset_id: string; amount: number }) {
+  public async blindRecive(params: InvoiceRequest) {
     return await this.getSdk().blindRecive(params);
+  }
+
+  public async withessRecive(params:InvoiceRequest) {
+    return await this.getSdk().withessRecive(params);
   }
 
   public async issueAssetNia(params: IssueAssetNiaRequestModel) {

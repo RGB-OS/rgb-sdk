@@ -2,9 +2,10 @@
   "name": "rgb-connect-nodejs",
   "version": "1.0.22",
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "tsup": "^8.4.0",
-    "typescript": "^5.8.3"
+    "@types/node": "^22.17.2",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2"
   },
   "type": "commonjs",
   "main": "dist/index.cjs",
@@ -39,15 +40,15 @@
     "bitcoinjs-lib": "^6.1.7",
     "ecpair": "^3.0.0",
     "os": "^0.1.2",
-    "rgb-lib": "0.3.0-beta.1",
+    "rgb-lib": "0.3.0-beta.2",
     "tiny-secp256k1": "^2.2.3"
   },
   "optionalDependencies": {
-    "@rgb-tools/rgb-lib-linux-x64": "0.3.0-beta.1",
-    "@rgb-tools/rgb-lib-linux-arm64": "0.3.0-beta.1",
-    "@rgb-tools/rgb-lib-darwin-x64": "0.3.0-beta.1",
-    "@rgb-tools/rgb-lib-darwin-arm64": "0.3.0-beta.1",
-    "@rgb-tools/rgb-lib-win32-x64": "0.3.0-beta.1"
+    "@rgb-tools/rgb-lib-darwin-arm64": "0.3.0-beta.2",
+    "@rgb-tools/rgb-lib-darwin-x64": "0.3.0-beta.2",
+    "@rgb-tools/rgb-lib-linux-arm64": "0.3.0-beta.2",
+    "@rgb-tools/rgb-lib-linux-x64": "0.3.0-beta.2",
+    "@rgb-tools/rgb-lib-win32-x64": "0.3.0-beta.2"
   },
   "keywords": [
     "bdk",

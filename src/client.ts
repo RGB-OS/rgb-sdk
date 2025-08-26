@@ -1,6 +1,6 @@
 // src/index.ts
 import { createClient } from "./http";
-import { AssetBalanceResponse, BtcBalance, FailTransfersRequest, InvoiceReciveData, IssueAssetNIAResponse, ListAssetsResponse, RGBHTTPClientParams, RgbTransfer, SendAssetBeginRequestModel, SendAssetEndRequestModel, Unspent } from "./types/rgb-model";
+import { AssetBalanceResponse, BtcBalance, FailTransfersRequest, InvoiceReciveData, InvoiceRequest, IssueAssetNIAResponse, ListAssetsResponse, RGBHTTPClientParams, RgbTransfer, SendAssetBeginRequestModel, SendAssetEndRequestModel, Unspent } from "./types/rgb-model";
 
 
 export class ThunderLink {
@@ -49,8 +49,13 @@ export class ThunderLink {
     return data;
   }
 
-  async blindRecive(params: { asset_id: string; amount: number }): Promise<InvoiceReciveData> {
-    const { data } = await this.client.post("/blindreceive", params);
+  async blindRecive(params: InvoiceRequest): Promise<InvoiceReciveData> {
+    const { data } = await this.client.post("/wallet/blindreceive", params);
+    return data;
+  }
+
+  async withessRecive(params: InvoiceRequest): Promise<InvoiceReciveData> {
+    const { data } = await this.client.post("/wallet/witnessreceive", params);
     return data;
   }
 
