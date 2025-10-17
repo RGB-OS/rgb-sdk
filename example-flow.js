@@ -123,6 +123,8 @@ async function createReceivingWalletAndTransfer(senderWallet, assetId) {
         // Get receiver address
         const receiverAddress = await receiverWallet.getAddress();
         console.log(`Receiver address: ${receiverAddress}`);
+
+        await createUtxosForWallet(receiverAddress)
         
         // Create blind receive for the asset
         console.log("Creating blind receive...");
@@ -136,14 +138,24 @@ async function createReceivingWalletAndTransfer(senderWallet, assetId) {
         const invoice = receiveData.invoice;
         console.log(`Invoice: ${invoice}`);
         
-        // Send asset using the invoice
-        console.log("Sending asset...");
-        const sendResult = await senderWallet.send({
+        // Step 1: Begin asset transfer
+        console.log("Step 1: Starting asset transfer...");
+        const sendPsbt = await senderWallet.sendBegin({
             invoice: invoice,
             fee_rate: 1,
             min_confirmations: 1
         });
-        console.log("Asset sent:", sendResult);
+        console.log("Unsigned PSBT for asset transfer:", sendPsbt);
+        
+        // Step 2: Sign the PSBT
+        console.log("Step 2: Signing PSBT...");
+        const signedSendPsbt = await senderWallet.signPsbt(sendPsbt);
+        console.log("Signed PSBT:", signedSendPsbt);
+        
+        // Step 3: End asset transfer
+        console.log("Step 3: Finalizing asset transfer...");
+        const sendResult = await senderWallet.sendEnd({ signed_psbt: signedSendPsbt });
+        console.log("Asset transfer completed:", sendResult);
         
         // Refresh both wallets
         console.log("Refreshing wallets...");

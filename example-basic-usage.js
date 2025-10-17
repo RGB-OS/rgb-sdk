@@ -32,6 +32,8 @@ async function basicExample() {
         console.log("\n3. Getting wallet address...");
         const address = await wallet.getAddress();
         console.log("Wallet address:", address);
+
+        // TODO: send some BTC to the wallet
         
         // Step 4: Check BTC balance
         console.log("\n4. Checking BTC balance...");
@@ -43,9 +45,35 @@ async function basicExample() {
         const assets = await wallet.listAssets();
         console.log("Assets:", JSON.stringify(assets, null, 2));
         
-        // Step 6: Issue a new asset (if no assets exist)
+        // Step 6: Create UTXOs using three-step approach
+        console.log("\n6. Creating UTXOs using three-step approach...");
+        try {
+            // Step 1: Begin UTXO creation
+            console.log("Step 1: Starting UTXO creation...");
+            const psbt = await wallet.createUtxosBegin({
+                upTo: true,
+                num: 3,
+                size: 1000,
+                feeRate: 1
+            });
+            console.log("Unsigned PSBT for UTXO creation:", psbt);
+            
+            // Step 2: Sign the PSBT
+            console.log("Step 2: Signing PSBT...");
+            const signedPsbt = await wallet.signPsbt(psbt);
+            console.log("Signed PSBT:", signedPsbt);
+            
+            // Step 3: End UTXO creation
+            console.log("Step 3: Finalizing UTXO creation...");
+            const utxosCreated = await wallet.createUtxosEnd({ signedPsbt });
+            console.log(`Created ${utxosCreated} UTXOs`);
+        } catch (error) {
+            console.log("UTXO creation failed (this is expected if no BTC balance):", error.message);
+        }
+        
+        // Step 7: Issue a new asset (if no assets exist)
         if (!assets.nia || assets.nia.length === 0) {
-            console.log("\n6. Issuing a new RGB asset...");
+            console.log("\n7. Issuing a new RGB asset...");
             const newAsset = await wallet.issueAssetNia({
                 ticker: "DEMO",
                 name: "Demo Token",
@@ -54,18 +82,18 @@ async function basicExample() {
             });
             console.log("New asset issued:", JSON.stringify(newAsset, null, 2));
         } else {
-            console.log("\n6. Assets already exist, skipping issuance");
+            console.log("\n7. Assets already exist, skipping issuance");
         }
         
-        // Step 7: List assets again
-        console.log("\n7. Listing assets after issuance...");
+        // Step 8: List assets again
+        console.log("\n8. Listing assets after issuance...");
         const updatedAssets = await wallet.listAssets();
         console.log("Updated assets:", JSON.stringify(updatedAssets, null, 2));
         
-        // Step 8: Get asset balance (if assets exist)
+        // Step 9: Get asset balance (if assets exist)
         if (updatedAssets.nia && updatedAssets.nia.length > 0) {
             const assetId = updatedAssets.nia[0].assetId;
-            console.log("\n8. Getting asset balance...");
+            console.log("\n9. Getting asset balance...");
             const assetBalance = await wallet.getAssetBalance(assetId);
             console.log("Asset balance:", JSON.stringify(assetBalance, null, 2));
         }
