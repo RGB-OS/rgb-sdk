@@ -19,7 +19,9 @@
     "version:major": "npm version major && git push && git push --tags && npm publish --access public",
     "example": "node scripts/signPsbt.mjs",
     "initWallet": "node scripts/initWallet.js",
-    "demo": "node scripts/demo.mjs"
+    "demo": "node scripts/demo.mjs",
+    "example:basic": "node example-basic-usage.js",
+    "example:complete": "node example-flow.js"
   },
   "files": [
     "dist",
