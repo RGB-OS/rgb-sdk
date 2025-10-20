@@ -1,7 +1,7 @@
 
 # SDK Overview
 
-This is the underlying SDK used by the official **RGB Client Server**. It provides a complete set of TypeScript/Node.js bindings for interacting with the **RGB Node** and managing RGB-based transfers.
+This is the underlying SDK used by RGB client applications. It provides a complete set of TypeScript/Node.js bindings for interacting with the **RGB Node** and managing RGB-based transfers.
 
 ---
 
