@@ -1,7 +1,7 @@
 
 # `rgb-connect-nodejs` SDK Overview
 
-This is the underlying SDK used by the official **ThunderLink RGB Client Server**. It provides a complete set of TypeScript/Node.js bindings for interacting with the **ThunderLink RGB Manager** and managing RGB-based transfers.
+This is the underlying SDK used by the official **ThunderLink RGB Client Server**. It provides a complete set of TypeScript/Node.js bindings for interacting with the **ThunderLink RGB Node** and managing RGB-based transfers.
 
 ---
 
@@ -33,7 +33,7 @@ You might consider building your own RGB Client Server using this SDK if:
 | Method | Description |
 |--------|-------------|
 | `generateKeys()` | Generate wallet keypair with mnemonic/xpub/xprv |
-| `registerWallet()` | Register wallet with the RGB Manager |
+| `registerWallet()` | Register wallet with the RGB Node |
 | `getBtcBalance()` | Get on-chain BTC balance |
 | `getAddress()` | Get a derived deposit address |
 | `listUnspents()` | List unspent UTXOs |
@@ -74,7 +74,7 @@ Submit the signed PSBT via `sendEnd({ signed_psbt })` to complete the transfer.
 
 ## 🧩 Notes for Custom Integration
 
-- All communication with the ThunderLink RGB Manager is handled via HTTP API calls encapsulated in the `ThunderLink` class.
+- All communication with the ThunderLink RGB Node is handled via HTTP API calls encapsulated in the `ThunderLink` class.
 - The `signPsbt` method demonstrates how to integrate a signing flow using `bdk-wasm`. This can be replaced with your own HSM or hardware wallet integration if needed.
 - By using this SDK, developers have full control over:
   - Transfer orchestration
