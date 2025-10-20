@@ -1,5 +1,5 @@
 
-# `rgb-connect-nodejs` SDK Overview
+# SDK Overview
 
 This is the underlying SDK used by the official **RGB Client Server**. It provides a complete set of TypeScript/Node.js bindings for interacting with the **RGB Node** and managing RGB-based transfers.
 
@@ -210,7 +210,7 @@ const transfers = await wallet.listTransfers(assetId);
 ```javascript
 const { wallet, createWallet } = require('rgb-connect-nodejs');
 
-async function completeExample() {
+async function demo() {
     // 1. Generate and initialize wallet
     const keys = createWallet();
     wallet.init({
