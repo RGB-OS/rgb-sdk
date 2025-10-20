@@ -85,7 +85,7 @@ wallet.init({
     master_fingerprint: keys.masterFingerprint,
     mnemonic: keys.mnemonic,
     network: "3", // Regtest
-    rgbEndpoint: "http://127.0.0.1:8000"
+    rgbEndpoint: "http://127.0.0.1:8000" // RGB Node endpoint
 });
 
 // 3. Get wallet address
@@ -114,7 +114,7 @@ wallet.init({
     master_fingerprint: keys.masterFingerprint,
     mnemonic: keys.mnemonic,
     network: "3", // 1=Mainnet, 2=Testnet, 3=Regtest
-    rgbEndpoint: "http://127.0.0.1:8000"
+    rgbEndpoint: "http://127.0.0.1:8000" // RGB Node endpoint
 });
 
 // Register wallet with RGB Node
@@ -177,6 +177,10 @@ const signedSendPsbt = await senderWallet.signPsbt(sendPsbt);
 const sendResult = await senderWallet.sendEnd({ 
     signed_psbt: signedSendPsbt 
 });
+
+// Refresh both wallets to sync the transfer
+await senderWallet.refreshWallet();
+await receiverWallet.refreshWallet();
 
 
 ```
