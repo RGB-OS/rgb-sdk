@@ -17,35 +17,37 @@ With this SDK, developers can:
 ---
 
 
-## ⚙️ Capabilities of `rgb-connect-nodejs` (via `WalletManager`)
+## ⚙️ Capabilities of `rgb-sdk` (via `WalletManager`)
 
 | Method | Description |
 |--------|-------------|
-| `generateKeys()` | Generate wallet keypair with mnemonic/xpub/xprv |
+| `generateKeys(network)` | Generate new wallet keypair with mnemonic/xpub/master fingerprint |
+| `deriveKeysFromMnemonic(network, mnemonic)` | Derive wallet keys from existing mnemonic |
 | `registerWallet()` | Register wallet with the RGB Node |
 | `getBtcBalance()` | Get on-chain BTC balance |
 | `getAddress()` | Get a derived deposit address |
 | `listUnspents()` | List unspent UTXOs |
 | `listAssets()` | List RGB assets held |
-| `getAssetBalance(assetId)` | Get balance for a specific asset |
-| `createUtxosBegin(params)` | Start creating new UTXOs |
-| `createUtxosEnd({ signedPsbt })` | Finalize UTXO creation with a signed PSBT |
-| `blindRecive({ asset_id, amount })` | Generate blinded UTXO for receiving |
+| `getAssetBalance(asset_id)` | Get balance for a specific asset |
+| `createUtxosBegin({ up_to, num, size, fee_rate })` | Start creating new UTXOs |
+| `createUtxosEnd({ signed_psbt })` | Finalize UTXO creation with a signed PSBT |
+| `blindReceive({ asset_id, amount })` | Generate blinded UTXO for receiving |
+| `witnessReceive({ asset_id, amount })` | Generate witness UTXO for receiving |
 | `issueAssetNia({...})` | Issue a new Non-Inflationary Asset |
-| `signPsbt({ psbtBase64, mnemonic })` | Sign PSBT using mnemonic and BDK |
+| `signPsbt(psbt, mnemonic?)` | Sign PSBT using mnemonic and BDK (async) |
 | `refreshWallet()` | Sync and refresh wallet state |
 | `listTransactions()` | List BTC-level transactions |
-| `listTransfers(assetId)` | List RGB transfer history for asset |
+| `listTransfers(asset_id)` | List RGB transfer history for asset |
 | `failTransfers(...)` | Mark expired transfers as failed |
 | `sendBegin(...)` | Prepare a transfer (build unsigned PSBT) |
 | `sendEnd(...)` | Submit signed PSBT to complete transfer |
-| `send(...)` | Internal backend method that automates `sendBegin` + `signPsbt` + `sendEnd` (should not be exposed to client) |
+| `send(...)` | Complete send operation: begin → sign → end |
 
 ---
 
 ## 🧩 Notes for Custom Integration
 
-- All communication with the RGB Node is handled via HTTP API calls encapsulated in the `ThunderLink` class.
+- All communication with the RGB Node is handled via HTTP API calls encapsulated in the `RGBClient` class.
 - The `signPsbt` method demonstrates how to integrate a signing flow using `bdk-wasm`. This can be replaced with your own HSM or hardware wallet integration if needed.
 - By using this SDK, developers have full control over:
   - Transfer orchestration
@@ -66,26 +68,36 @@ This pattern enables advanced use cases, such as:
 ### Installation
 
 ```bash
-npm install rgb-connect-nodejs
+npm install rgb-sdk
 ```
+
+### Important: WASM Module Support
+
+This SDK uses WebAssembly modules for cryptographic operations. When running scripts, you may need to use the `--experimental-wasm-modules` flag:
+
+```bash
+node --experimental-wasm-modules your-script.js
+```
+
+**Note**: All npm scripts in this project already include this flag automatically. See [WASM_CONFIG.md](./WASM_CONFIG.md) for detailed configuration options.
 
 ### Basic Usage
 
 ```javascript
-const { wallet, createWallet } = require('rgb-connect-nodejs');
+const { WalletManager, createWallet } = require('rgb-sdk');
 
 // 1. Generate wallet keys
-const keys = createWallet();
-console.log('Master Fingerprint:', keys.masterFingerprint);
+const keys = await createWallet('regtest');
+console.log('Master Fingerprint:', keys.master_fingerprint);
 
-// 2. Initialize wallet
-wallet.init({
-    xpub_van: keys.accountXpubVanilla,
-    xpub_col: keys.accountXpubColored,
-    master_fingerprint: keys.masterFingerprint,
+// 2. Initialize wallet (constructor-based)
+const wallet = new WalletManager({
+    xpub_van: keys.account_xpub_vanilla,
+    xpub_col: keys.account_xpub_colored,
+    master_fingerprint: keys.master_fingerprint,
     mnemonic: keys.mnemonic,
-    network: "3", // Regtest
-    rgbEndpoint: "http://127.0.0.1:8000" // RGB Node endpoint
+    network: 'regtest',
+    rgb_node_endpoint: 'http://127.0.0.1:8000' // RGB Node endpoint
 });
 
 // 3. Get wallet address
@@ -104,21 +116,35 @@ console.log('BTC Balance:', balance);
 ### Wallet Initialization
 
 ```javascript
-// Generate new wallet keys
-const keys = createWallet();
+const { WalletManager, createWallet } = require('rgb-sdk');
 
-// Initialize wallet with keys
-wallet.init({
-    xpub_van: keys.accountXpubVanilla,
-    xpub_col: keys.accountXpubColored,
-    master_fingerprint: keys.masterFingerprint,
+// Generate new wallet keys
+const keys = await createWallet('regtest');
+
+// Initialize wallet with keys (constructor-based - recommended)
+const wallet = new WalletManager({
+    xpub_van: keys.account_xpub_vanilla,
+    xpub_col: keys.account_xpub_colored,
+    master_fingerprint: keys.master_fingerprint,
     mnemonic: keys.mnemonic,
-    network: "3", // 1=Mainnet, 2=Testnet, 3=Regtest
-    rgbEndpoint: "http://127.0.0.1:8000" // RGB Node endpoint
+    network: 'regtest', // 'mainnet', 'testnet', 'signet', or 'regtest'
+    rgb_node_endpoint: 'http://127.0.0.1:8000' // RGB Node endpoint
 });
 
 // Register wallet with RGB Node
 await wallet.registerWallet();
+
+// Alternative: Derive keys from existing mnemonic
+const { deriveKeysFromMnemonic } = require('rgb-sdk');
+const restoredKeys = await deriveKeysFromMnemonic('testnet', 'abandon abandon abandon...');
+const restoredWallet = new WalletManager({
+    xpub_van: restoredKeys.account_xpub_vanilla,
+    xpub_col: restoredKeys.account_xpub_colored,
+    master_fingerprint: restoredKeys.master_fingerprint,
+    mnemonic: restoredKeys.mnemonic,
+    network: 'testnet',
+    rgb_node_endpoint: 'http://127.0.0.1:8000'
+});
 ```
 
 ### UTXO Management
@@ -126,17 +152,17 @@ await wallet.registerWallet();
 ```javascript
 // Step 1: Begin UTXO creation
 const psbt = await wallet.createUtxosBegin({
-    upTo: true,
+    up_to: true,
     num: 5,
     size: 1000,
-    feeRate: 1
+    fee_rate: 1
 });
 
-// Step 2: Sign the PSBT
-const signedPsbt = await wallet.signPsbt(psbt);
+// Step 2: Sign the PSBT (synchronous operation)
+const signed_psbt = wallet.signPsbt(psbt);
 
 // Step 3: Finalize UTXO creation
-const utxosCreated = await wallet.createUtxosEnd({ signedPsbt });
+const utxosCreated = await wallet.createUtxosEnd({ signed_psbt });
 console.log(`Created ${utxosCreated} UTXOs`);
 ```
 
@@ -158,8 +184,8 @@ console.log('Asset issued:', asset.asset?.assetId);
 
 ```javascript
 // Create blind receive for receiving wallet
-const receiveData = await receiverWallet.blindRecive({
-    asset_id: assetId,
+const receiveData = await receiverWallet.blindReceive({
+    asset_id: asset_id,
     amount: 100
 });
 
@@ -170,19 +196,24 @@ const sendPsbt = await senderWallet.sendBegin({
     min_confirmations: 1
 });
 
-// Step 2: Sign the PSBT
-const signedSendPsbt = await senderWallet.signPsbt(sendPsbt);
+// Step 2: Sign the PSBT (synchronous operation)
+const signed_send_psbt = senderWallet.signPsbt(sendPsbt);
 
 // Step 3: Finalize transfer
 const sendResult = await senderWallet.sendEnd({ 
-    signed_psbt: signedSendPsbt 
+    signed_psbt: signed_send_psbt 
+});
+
+// Alternative: Complete send in one call
+const sendResult2 = await senderWallet.send({
+    invoice: receiveData.invoice,
+    fee_rate: 1,
+    min_confirmations: 1
 });
 
 // Refresh both wallets to sync the transfer
 await senderWallet.refreshWallet();
 await receiverWallet.refreshWallet();
-
-
 ```
 
 ### Balance and Asset Management
@@ -204,7 +235,7 @@ const unspents = await wallet.listUnspents();
 const transactions = await wallet.listTransactions();
 
 // List transfers for specific asset
-const transfers = await wallet.listTransfers(assetId);
+const transfers = await wallet.listTransfers(asset_id);
 ```
 
 ---
@@ -212,18 +243,18 @@ const transfers = await wallet.listTransfers(assetId);
 ## Setup wallet and issue asset
 
 ```javascript
-const { wallet, createWallet } = require('rgb-connect-nodejs');
+const { WalletManager, createWallet } = require('rgb-sdk');
 
 async function demo() {
     // 1. Generate and initialize wallet
-    const keys = createWallet();
-    wallet.init({
-        xpub_van: keys.accountXpubVanilla,
-        xpub_col: keys.accountXpubColored,
-        master_fingerprint: keys.masterFingerprint,
+    const keys = await createWallet('regtest');
+    const wallet = new WalletManager({
+        xpub_van: keys.account_xpub_vanilla,
+        xpub_col: keys.account_xpub_colored,
+        master_fingerprint: keys.master_fingerprint,
         mnemonic: keys.mnemonic,
-        network: "3",
-        rgbEndpoint: "http://127.0.0.1:8000"
+        network: 'regtest',
+        rgb_node_endpoint: 'http://127.0.0.1:8000'
     });
 
     // 2. Register wallet
@@ -237,13 +268,13 @@ async function demo() {
 
     // 4. Create UTXOs 
     const psbt = await wallet.createUtxosBegin({
-        upTo: true,
+        up_to: true,
         num: 5,
         size: 1000,
-        feeRate: 1
+        fee_rate: 1
     });
-    const signedPsbt = await wallet.signPsbt(psbt);
-    const utxosCreated = await wallet.createUtxosEnd({ signedPsbt });
+    const signed_psbt = wallet.signPsbt(psbt); // Synchronous operation
+    const utxosCreated = await wallet.createUtxosEnd({ signed_psbt });
 
     // 5. Issue asset
     const asset = await wallet.issueAssetNia({
@@ -255,9 +286,9 @@ async function demo() {
 
     // 6. List assets and balances
     const assets = await wallet.listAssets();
-    const assetBalance = await wallet.getAssetBalance(asset.asset?.assetId);
+    const assetBalance = await wallet.getAssetBalance(asset.asset?.asset_id);
 
-    // Wallet is ready to send/recive RGB assets
+    // Wallet is ready to send/receive RGB assets
 }
 ```
 
@@ -268,12 +299,18 @@ async function demo() {
 ### Key Management
 
 ```javascript
-// Store mnemonic securely
-const keys = createWallet();
+const { createWallet, deriveKeysFromMnemonic } = require('rgb-sdk');
+
+// Generate new wallet keys
+const keys = await createWallet('testnet');
 const mnemonic = keys.mnemonic;
 
+// Store mnemonic securely for later restoration
 // Use environment variables for production
-const mnemonic = process.env.WALLET_MNEMONIC;
+const storedMnemonic = process.env.WALLET_MNEMONIC;
+
+// Restore keys from mnemonic
+const restoredKeys = await deriveKeysFromMnemonic('testnet', storedMnemonic);
 ```
 
 ---

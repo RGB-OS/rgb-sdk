@@ -1,9 +1,9 @@
 
-export type RGBHTTPClientParams ={ 
-  xpub_van: string,
-  xpub_col: string, 
-  master_fingerprint:string,
-  rgbEndpoint: string, 
+export type RGBHTTPClientParams = {
+  xpub_van: string;
+  xpub_col: string;
+  master_fingerprint: string;
+  rgbEndpoint: string;
 }
 
 export interface FailTransfersRequest {
@@ -93,7 +93,7 @@ export interface BtcBalance {
   vanilla: Balance,
   colored: Balance
 }
-export interface InvoiceReciveData {
+export interface InvoiceReceiveData {
   invoice: string
   recipient_id: string
   expiration_timestamp: number

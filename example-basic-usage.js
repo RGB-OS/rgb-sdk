@@ -4,7 +4,7 @@ const { wallet, createWallet } = require("./dist/index.cjs");
 const RGB_MANAGER_ENDPOINT = "http://127.0.0.1:8000"; // RGB Manager endpoint
 
 async function basicExample() {
-    console.log("ThunderLink RGB Wallet - Basic Example");
+    console.log("RGB SDK - Basic Example");
     console.log("=" .repeat(40));
     
     try {

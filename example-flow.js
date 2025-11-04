@@ -3,15 +3,15 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-// Import the thunderlink-client library
+// Import the rgb-sdk library
 const { wallet, createWallet } = require("./dist/index.cjs");
 
 // Configuration
 const RGB_MANAGER_ENDPOINT = "http://127.0.0.1:8000";
 
-// Initialize wallet with ThunderLink SDK
-async function initWalletWithThunderLink() {
-    console.log("\nInitializing wallet with ThunderLink SDK...");
+// Initialize wallet with RGB SDK
+async function initWalletWithRGBSDK() {
+    console.log("\nInitializing wallet with RGB SDK...");
     
     // Generate keys using the library
     const keys = createWallet();
@@ -32,7 +32,7 @@ async function initWalletWithThunderLink() {
         rgbEndpoint: RGB_MANAGER_ENDPOINT
     });
 
-    console.log("Wallet initialized with ThunderLink SDK");
+    console.log("Wallet initialized with RGB SDK");
     return { keys, wallet };
 }
 
@@ -182,12 +182,12 @@ async function createReceivingWalletAndTransfer(senderWallet, assetId) {
 
 // Main execution function
 async function main() {
-    console.log("Starting ThunderLink RGB Wallet Example");
+    console.log("Starting RGB SDK Wallet Example");
     console.log("=" .repeat(50));
     
     try {
         //  Initialize wallet
-        const { keys, wallet: senderWallet } = await initWalletWithThunderLink();
+        const { keys, wallet: senderWallet } = await initWalletWithRGBSDK();
         
         //  Create UTXOs
         const utxosCreated = await createUtxosForWallet(senderWallet);
@@ -243,7 +243,7 @@ async function main() {
 
 // Run the example
 if (require.main === module) {
-    console.log("ThunderLink RGB Wallet Complete Example");
+    console.log("RGB SDK Wallet Complete Example");
     console.log("This example demonstrates:");
     console.log("- Wallet creation and initialization");
     console.log("- UTXO creation and management");
@@ -265,7 +265,7 @@ if (require.main === module) {
 
 module.exports = {
     main,
-    initWalletWithThunderLink,
+    initWalletWithRGBSDK,
     createUtxosForWallet,
     issueAssets,
     createReceivingWalletAndTransfer,

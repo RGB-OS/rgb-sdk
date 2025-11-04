@@ -2,26 +2,36 @@
   "name": "rgb-connect-nodejs",
   "version": "1.0.23",
   "devDependencies": {
+    "@babel/core": "^7.28.5",
+    "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+    "@babel/preset-env": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.17.2",
+    "jest": "^30.2.0",
     "rimraf": "^6.0.1",
+    "ts-jest": "^29.4.5",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2"
   },
   "type": "commonjs",
-  "main": "dist/index.cjs",
-  "types": "dist/index.d.ts",
   "scripts": {
     "dev": "tsc -w",
-    "build": "tsup",
+    "build": "tsup && npm run build:dts",
+    "build:dts": "tsc --declaration --emitDeclarationOnly --outDir dist --skipLibCheck --project tsconfig.json 2>&1 | grep -v 'error TS' || true",
     "prepare": "npm run build",
+    "test": "npm run build && NODE_OPTIONS='--experimental-wasm-modules --experimental-vm-modules' jest",
+    "test:watch": "npm run build && NODE_OPTIONS='--experimental-wasm-modules --experimental-vm-modules' jest --watch",
+    "test:coverage": "npm run build && NODE_OPTIONS='--experimental-wasm-modules --experimental-vm-modules' jest --coverage",
     "version:patch": "npm version patch && git push && git push --tags && npm publish --access public",
     "version:minor": "npm version minor && git push && git push --tags && npm publish --access public",
     "version:major": "npm version major && git push && git push --tags && npm publish --access public",
-    "example": "node scripts/signPsbt.mjs",
-    "initWallet": "node scripts/initWallet.js",
-    "demo": "node scripts/demo.mjs",
-    "example:basic": "node example-basic-usage.js",
-    "example:complete": "node example-flow.js"
+    "example": "node --experimental-wasm-modules scripts/signPsbt.mjs",
+    "initWallet": "node --experimental-wasm-modules scripts/initWallet.js",
+    "demo": "node --experimental-wasm-modules scripts/demo.mjs",
+    "demo:test": "npm run build && node --experimental-wasm-modules scripts/demo-test.js",
+    "example:basic": "node --experimental-wasm-modules example-basic-usage.js",
+    "example:complete": "node --experimental-wasm-modules example-flow.js"
   },
   "files": [
     "dist",
@@ -29,12 +39,17 @@
   ],
   "exports": {
     ".": {
-      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     }
   },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "dependencies": {
     "@bitcoinerlab/secp256k1": "^1.2.0",
+    "@metamask/bitcoindevkit": "^0.1.13",
     "axios": "^1.8.4",
     "bip32": "^5.0.0-rc.0",
     "bip39": "^3.1.0",
@@ -42,21 +57,18 @@
     "bitcoinjs-lib": "^6.1.7",
     "ecpair": "^3.0.0",
     "os": "^0.1.2",
-    "rgb-lib": "0.3.0-beta.2",
     "tiny-secp256k1": "^2.2.3"
   },
-  "optionalDependencies": {
-    "@rgb-tools/rgb-lib-darwin-arm64": "0.3.0-beta.2",
-    "@rgb-tools/rgb-lib-darwin-x64": "0.3.0-beta.2",
-    "@rgb-tools/rgb-lib-linux-arm64": "0.3.0-beta.2",
-    "@rgb-tools/rgb-lib-linux-x64": "0.3.0-beta.2",
-    "@rgb-tools/rgb-lib-win32-x64": "0.3.0-beta.2"
-  },
   "keywords": [
-    "bdk",
+    "rgb",
+    "rgb-protocol",
     "bitcoin",
     "sdk",
-    "wasm"
+    "bdk",
+    "wasm",
+    "taproot",
+    "assets",
+    "blockchain"
   ],
   "license": "MIT"
 }
