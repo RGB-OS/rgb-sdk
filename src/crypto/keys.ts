@@ -182,6 +182,7 @@ async function masterFingerprintFromNode(node: BIP32Interface): Promise<string> 
   // Workaround for TypeScript DTS build type resolution issue
   const ripemd160Fn = ripemd160Sync as (data: Uint8Array | Buffer) => Promise<Uint8Array>;
   const ripe = await ripemd160Fn(sha as Uint8Array);
+  // @ts-ignore
   return ripe.subarray(0, 4).toString('hex');
 }
 

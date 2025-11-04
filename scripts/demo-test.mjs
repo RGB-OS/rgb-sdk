@@ -4,7 +4,8 @@
  * Tests key derivation and PSBT signing with provided test data
  */
 
-const { generateKeys, deriveKeysFromMnemonic, signPsbt } = require('../dist/index.cjs');
+import { generateKeys, deriveKeysFromMnemonic, signPsbt } from '../dist/index.cjs';
+// const { generateKeys, deriveKeysFromMnemonic, signPsbt } = require('../dist/index.cjs');
 
 // Test data from user
 const testMnemonic = 'poem twice question inch happy capital grain quality laptop dry chaos what';
@@ -113,7 +114,7 @@ async function runDemo() {
   // Test 3: Sign UTXO creation PSBT
   console.log('\n3️⃣ Testing signPsbt() with UTXO creation PSBT...');
   try {
-    const signedUtxo = signPsbt(testMnemonic, utxoUnsignedPsbt, 'testnet');
+    const signedUtxo = await signPsbt(testMnemonic, utxoUnsignedPsbt, 'testnet');
     
     if (signedUtxo && signedUtxo.startsWith('cHNidP8')) {
       console.log('✅ signPsbt() - Signed PSBT format valid');
@@ -141,7 +142,7 @@ async function runDemo() {
   // Test 4: Sign send PSBT
   console.log('\n4️⃣ Testing signPsbt() with send PSBT...');
   try {
-    const signedSend = signPsbt(testMnemonic, sendUnsignedPsbt, 'testnet');
+    const signedSend = await signPsbt(testMnemonic, sendUnsignedPsbt, 'testnet');
     
     if (signedSend && signedSend.startsWith('cHNidP8')) {
       console.log('✅ signPsbt() - Signed send PSBT format valid');

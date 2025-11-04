@@ -9,7 +9,7 @@
 //   import { signPsbt, signPsbtSync } from './signer';
 //   const signedPsbt = signPsbt(mnemonic, psbtBase64, 'testnet');
 
-import * as bdk from '@metamask/bitcoindevkit';
+import init, * as bdk from '@bitcoindevkit/bdk-wallet-node';
 import { isNode } from '../utils/environment';
 import { ripemd160Sync, sha256Sync } from '../utils/crypto-browser';
 import type { BIP32Interface } from 'bip32';
@@ -313,6 +313,7 @@ async function getMasterFingerprint(rootNode: BIP32Interface): Promise<string> {
   // Workaround for TypeScript DTS build type resolution issue
   const ripemd160Fn = ripemd160Sync as (data: Uint8Array | Buffer) => Promise<Uint8Array>;
   const ripe = await ripemd160Fn(sha);
+  // @ts-ignore
   return ripe.slice(0, 4).toString('hex');
 }
 
