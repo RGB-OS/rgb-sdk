@@ -1,6 +1,6 @@
 // Main wallet exports
-export { wallet, createWallet, WalletManager, createWalletManager } from './wallet';
-export type { WalletInitParams } from './wallet';
+export { wallet, createWallet, WalletManager, createWalletManager } from './wallet/index';
+export type { WalletInitParams } from './wallet/index';
 
 // Client exports
 export { RGBClient, createClient } from './client/index';

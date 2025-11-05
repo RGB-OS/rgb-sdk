@@ -33,8 +33,8 @@ import {
   COIN_RGB_MAINNET,
   COIN_RGB_TESTNET,
 } from '../constants';
-import { calculateMasterFingerprint } from './utils/fingerprint';
-import { normalizeSeedBuffer, toNetworkName, getNetworkVersions } from './utils/bip32-helpers';
+import { calculateMasterFingerprint } from '../utils/fingerprint';
+import { normalizeSeedBuffer, toNetworkName, getNetworkVersions } from '../utils/bip32-helpers';
 import type { BIP39Module, ECCModule, BIP32Factory } from './types';
 
 // Dynamic imports for browser compatibility
@@ -386,10 +386,8 @@ export async function deriveKeysFromMnemonic(
   
   try {
     await ensureDependencies();
-    console.log('mnemonic', mnemonic);
     const trimmedMnemonic = mnemonic.trim();
     if (!bip39 || !bip39.validateMnemonic(trimmedMnemonic)) {
-      console.log('trimmedMnemonic', trimmedMnemonic);
       throw new ValidationError('Invalid mnemonic format - failed BIP39 validation', 'mnemonic');
     }
     

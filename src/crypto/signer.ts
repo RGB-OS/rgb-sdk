@@ -42,8 +42,8 @@ import type {
   BDKNetwork,
   BDKSignOptions
 } from './types';
-import { calculateMasterFingerprint } from './utils/fingerprint';
-import { getNetworkVersions as getBIP32NetworkVersions, normalizeSeedBuffer } from './utils/bip32-helpers';
+import { calculateMasterFingerprint } from '../utils/fingerprint';
+import { getNetworkVersions as getBIP32NetworkVersions, normalizeSeedBuffer } from '../utils/bip32-helpers';
 
 // Dynamic imports for browser compatibility
 let bip39: BIP39Module | undefined;

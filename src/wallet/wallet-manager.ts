@@ -1,5 +1,18 @@
 import { RGBClient } from '../client/index';
-import { FailTransfersRequest, InvoiceRequest, IssueAssetNiaRequestModel, SendAssetBeginRequestModel, SendAssetEndRequestModel } from '../types/rgb-model';
+import { 
+  FailTransfersRequest, 
+  InvoiceRequest, 
+  InvoiceReceiveData,
+  IssueAssetNiaRequestModel, 
+  IssueAssetNIAResponse,
+  SendAssetBeginRequestModel, 
+  SendAssetEndRequestModel,
+  AssetBalanceResponse,
+  BtcBalance,
+  ListAssetsResponse,
+  Unspent,
+  RgbTransfer
+} from '../types/rgb-model';
 import { signPsbt } from '../crypto';
 import type { Network } from '../crypto';
 import { generateKeys } from '../crypto';
@@ -55,32 +68,28 @@ export class WalletManager {
   private readonly network: Network;
   private readonly masterFingerprint: string;
 
-      constructor(params: WalletInitParams) {
-        // Validate required parameters (skip validation for placeholder values for backward compatibility)
-        const isPlaceholder = params.xpub_van === 'PLACEHOLDER' || !params.xpub_van;
-        
-        if (!isPlaceholder) {
-          if (!params.xpub_van) {
-            throw new ValidationError('xpub_van is required', 'xpub_van');
-          }
-          if (!params.xpub_col) {
-            throw new ValidationError('xpub_col is required', 'xpub_col');
-          }
-          if (!params.rgb_node_endpoint) {
-            throw new ValidationError('rgb_node_endpoint is required', 'rgb_node_endpoint');
-          }
-          if (!params.master_fingerprint) {
-            throw new ValidationError('master_fingerprint is required', 'master_fingerprint');
-          }
-        }
+  constructor(params: WalletInitParams) {
+    // Validate required parameters
+    if (!params.xpub_van) {
+      throw new ValidationError('xpub_van is required', 'xpub_van');
+    }
+    if (!params.xpub_col) {
+      throw new ValidationError('xpub_col is required', 'xpub_col');
+    }
+    if (!params.rgb_node_endpoint) {
+      throw new ValidationError('rgb_node_endpoint is required', 'rgb_node_endpoint');
+    }
+    if (!params.master_fingerprint) {
+      throw new ValidationError('master_fingerprint is required', 'master_fingerprint');
+    }
 
-        // Initialize RGB client (use minimal valid values for placeholder)
-        this.client = new RGBClient({
-          xpub_van: params.xpub_van || 'PLACEHOLDER',
-          xpub_col: params.xpub_col || 'PLACEHOLDER',
-          rgbEndpoint: params.rgb_node_endpoint || 'http://127.0.0.1:8000',
-          master_fingerprint: params.master_fingerprint || '00000000',
-        });
+    // Initialize RGB client
+    this.client = new RGBClient({
+      xpub_van: params.xpub_van,
+      xpub_col: params.xpub_col,
+      rgbEndpoint: params.rgb_node_endpoint,
+      master_fingerprint: params.master_fingerprint,
+    });
 
     // Store wallet state
     this.xpub_van = params.xpub_van;
@@ -111,11 +120,11 @@ export class WalletManager {
 
   // ========== RGB API Methods (delegated to RGBClient) ==========
 
-  public async registerWallet(): Promise<{ address: string; btc_balance: any }> {
+  public async registerWallet(): Promise<{ address: string; btc_balance: BtcBalance }> {
     return this.client.registerWallet();
   }
 
-  public async getBtcBalance(): Promise<any> {
+  public async getBtcBalance(): Promise<BtcBalance> {
     return this.client.getBtcBalance();
   }
 
@@ -123,15 +132,15 @@ export class WalletManager {
     return this.client.getAddress();
   }
 
-  public async listUnspents(): Promise<any[]> {
+  public async listUnspents(): Promise<Unspent[]> {
     return this.client.listUnspents();
   }
 
-  public async listAssets(): Promise<any> {
+  public async listAssets(): Promise<ListAssetsResponse> {
     return this.client.listAssets();
   }
 
-  public async getAssetBalance(asset_id: string): Promise<any> {
+  public async getAssetBalance(asset_id: string): Promise<AssetBalanceResponse> {
     return this.client.getAssetBalance(asset_id);
   }
 
@@ -151,15 +160,15 @@ export class WalletManager {
     return this.client.sendEnd(params);
   }
 
-  public async blindReceive(params: InvoiceRequest): Promise<any> {
+  public async blindReceive(params: InvoiceRequest): Promise<InvoiceReceiveData> {
     return this.client.blindReceive(params);
   }
 
-  public async witnessReceive(params: InvoiceRequest): Promise<any> {
+  public async witnessReceive(params: InvoiceRequest): Promise<InvoiceReceiveData> {
     return this.client.witnessReceive(params);
   }
 
-  public async issueAssetNia(params: IssueAssetNiaRequestModel): Promise<any> {
+  public async issueAssetNia(params: IssueAssetNiaRequestModel): Promise<IssueAssetNIAResponse> {
     return this.client.issueAssetNia(params);
   }
 
@@ -167,11 +176,11 @@ export class WalletManager {
     return this.client.refreshWallet();
   }
 
-  public async listTransactions(): Promise<any> {
+  public async listTransactions(): Promise<unknown> {
     return this.client.listTransactions();
   }
 
-  public async listTransfers(asset_id: string): Promise<any[]> {
+  public async listTransfers(asset_id: string): Promise<RgbTransfer[]> {
     return this.client.listTransfers(asset_id);
   }
 
@@ -179,7 +188,7 @@ export class WalletManager {
     return this.client.failTransfers(params);
   }
 
-  public async decodeRGBInvoice(params: { invoice: string }): Promise<any> {
+  public async decodeRGBInvoice(params: { invoice: string }): Promise<SendAssetBeginRequestModel> {
     return this.client.decodeRGBInvoice(params);
   }
 
@@ -228,23 +237,18 @@ export function createWalletManager(params: WalletInitParams): WalletManager {
 }
 
 // Legacy singleton instance for backward compatibility
-// This instance cannot be used directly - must call init() first
 // @deprecated Use `new WalletManager(params)` or `createWalletManager(params)` instead
-// @warning This singleton will throw if methods are called without init()
-// Note: Using a getter to defer instantiation until actually used
+// This singleton will throw an error when accessed, requiring proper initialization
 let _wallet: WalletManager | null = null;
 
 export const wallet = new Proxy({} as WalletManager, {
   get(target, prop) {
     if (!_wallet) {
-      // Create a minimal instance for backward compatibility
-      // This will only work if init() is called before using any methods
-      _wallet = new WalletManager({
-        xpub_van: 'PLACEHOLDER', // Will be validated when init() is called
-        xpub_col: 'PLACEHOLDER',
-        rgb_node_endpoint: 'http://127.0.0.1:8000',
-        master_fingerprint: '00000000',
-      });
+      throw new WalletError(
+        'The legacy singleton wallet instance is deprecated. ' +
+        'Please use `new WalletManager(params)` or `createWalletManager(params)` instead. ' +
+        'Example: const wallet = new WalletManager({ xpub_van, xpub_col, rgb_node_endpoint, master_fingerprint })'
+      );
     }
     const value = (_wallet as any)[prop];
     return typeof value === 'function' ? value.bind(_wallet) : value;

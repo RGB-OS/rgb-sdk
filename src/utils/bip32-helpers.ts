@@ -1,7 +1,7 @@
-import { isNode } from '../../utils/environment';
-import { CryptoError } from '../../errors';
-import type { Network, NetworkVersions, BufferLike } from '../types';
-import { BIP32_VERSIONS } from '../../constants/network';
+import { isNode } from './environment';
+import { CryptoError } from '../errors';
+import type { Network, NetworkVersions, BufferLike } from '../crypto/types';
+import { BIP32_VERSIONS } from '../constants/network';
 
 function getWifVersion(network: Network): number {
   return network === 'mainnet' ? 0x80 : 0xef;

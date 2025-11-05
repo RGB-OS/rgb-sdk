@@ -71,6 +71,101 @@ This pattern enables advanced use cases, such as:
 npm install rgb-sdk
 ```
 
+### Browser Compatibility
+
+This SDK is browser-compatible but requires polyfills for Node.js built-in modules. The SDK uses WebAssembly modules and dynamically loads dependencies based on the environment.
+
+#### Required Polyfills
+
+For React/Next.js applications, you'll need to configure webpack to polyfill Node.js modules. Install the required polyfills:
+
+```bash
+npm install --save-dev crypto-browserify stream-browserify buffer process path-browserify
+```
+
+#### CRACO Configuration (React with Create React App)
+
+If you're using Create React App with CRACO, create a `craco.config.js` file:
+
+```javascript
+const path = require('path');
+const webpack = require('webpack');
+
+module.exports = {
+  webpack: {
+    alias: {
+      "@": path.resolve(__dirname, "src/"),
+    },
+    configure: (webpackConfig) => {
+      webpackConfig.resolve = webpackConfig.resolve || {};
+      webpackConfig.resolve.fallback = {
+        ...(webpackConfig.resolve.fallback || {}),
+        crypto: require.resolve('crypto-browserify'),
+        'node:crypto': require.resolve('crypto-browserify'),
+        stream: require.resolve('stream-browserify'),
+        buffer: require.resolve('buffer'),
+        process: require.resolve('process/browser'),
+        path: require.resolve('path-browserify'),
+        'node:path': require.resolve('path-browserify'),
+        fs: false,
+        module: false,
+      };
+
+      // WASM rule for .wasm files
+      const wasmRule = { test: /\.wasm$/, type: 'webassembly/sync' };
+      const oneOf = webpackConfig.module?.rules?.find(r => Array.isArray(r.oneOf))?.oneOf;
+      if (oneOf) {
+        const assetIdx = oneOf.findIndex(r => r.type === 'asset/resource');
+        if (assetIdx >= 0) oneOf.splice(assetIdx, 0, wasmRule);
+        else oneOf.unshift(wasmRule);
+      } else {
+        webpackConfig.module = webpackConfig.module || {};
+        webpackConfig.module.rules = [wasmRule, ...(webpackConfig.module.rules || [])];
+      }
+
+      webpackConfig.experiments = {
+        ...webpackConfig.experiments,
+        asyncWebAssembly: true,
+        topLevelAwait: true,
+        syncWebAssembly: true,
+        layers: true,
+      };
+
+      webpackConfig.plugins = (webpackConfig.plugins || []).concat([
+        new webpack.ProvidePlugin({
+          Buffer: ['buffer', 'Buffer'],
+          process: ['process'],
+        }),
+      ]);
+
+      return webpackConfig;
+    },
+  },
+};
+```
+
+#### Dynamic Import in Browser
+
+Use dynamic import to ensure WASM modules load correctly in browser environments:
+
+```javascript
+// Dynamic import ensures the WASM/glue load together
+const sdk = await import('rgb-sdk');
+
+const { WalletManager, createWallet } = sdk;
+
+// Use the SDK normally
+const keys = await createWallet('testnet');
+const wallet = new WalletManager({
+  xpub_van: keys.account_xpub_vanilla,
+  xpub_col: keys.account_xpub_colored,
+  master_fingerprint: keys.master_fingerprint,
+  mnemonic: keys.mnemonic,
+  network: 'testnet',
+  rgb_node_endpoint: 'http://127.0.0.1:8000'
+});
+```
+
 ### Important: WASM Module Support
 
 This SDK uses WebAssembly modules for cryptographic operations. When running scripts, you may need to use the `--experimental-wasm-modules` flag:
@@ -79,7 +174,7 @@ This SDK uses WebAssembly modules for cryptographic operations. When running scr
 node --experimental-wasm-modules your-script.js
 ```
 
-**Note**: All npm scripts in this project already include this flag automatically. See [WASM_CONFIG.md](./WASM_CONFIG.md) for detailed configuration options.
+**Note**: All npm scripts in this project already include this flag automatically. For browser environments, see the Browser Compatibility section above.
 
 ### Basic Usage
 

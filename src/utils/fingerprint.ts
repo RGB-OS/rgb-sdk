@@ -1,6 +1,6 @@
-import { ripemd160Sync, sha256Sync } from '../../utils/crypto-browser';
+import { ripemd160Sync, sha256Sync } from './crypto-browser';
 import type { BIP32Interface } from 'bip32';
-import { CryptoError } from '../../errors';
+import { CryptoError } from '../errors';
 
 /**
  * Calculate master fingerprint from BIP32 node
