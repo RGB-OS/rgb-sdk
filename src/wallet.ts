@@ -3,7 +3,7 @@ import { FailTransfersRequest, InvoiceRequest, IssueAssetNiaRequestModel, SendAs
 import { signPsbt } from './crypto';
 import type { Network } from './crypto';
 import { generateKeys } from './crypto';
-import { normalizeNetwork } from './utils/network';
+import { normalizeNetwork } from './utils/validation';
 import { ValidationError, WalletError } from './errors';
 
 /**

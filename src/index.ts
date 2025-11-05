@@ -13,7 +13,15 @@ export type { GeneratedKeys, AccountXpubs } from './crypto';
 
 // Function exports
 export { signPsbt, signPsbtSync } from './crypto';
-export { generateKeys, deriveKeysFromMnemonic, restoreKeys, accountXpubsFromMnemonic } from './crypto';
+export { 
+  generateKeys, 
+  deriveKeysFromMnemonic, 
+  restoreKeys, 
+  accountXpubsFromMnemonic,
+  getXprivFromMnemonic,
+  getXpubFromXpriv,
+  deriveKeysFromXpriv
+} from './crypto';
 
 // Error exports
 export {
@@ -27,6 +35,8 @@ export {
 
 // Utility exports
 export { logger, configureLogging, LogLevel } from './utils/logger';
+export { isNode, isBrowser, getEnvironment } from './utils/environment';
+export type { Environment } from './utils/environment';
 export {
   validateNetwork,
   normalizeNetwork,
@@ -37,7 +47,8 @@ export {
   validateRequired,
   validateString,
 } from './utils/validation';
-export { normalizeNetwork as normalizeNetworkUtil } from './utils/network';
+// normalizeNetwork is exported from validation.ts above
+// network.ts is kept for backward compatibility but normalizeNetwork from validation.ts is preferred
 
 // Constants exports
 export * from './constants';

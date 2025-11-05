@@ -152,8 +152,8 @@ describe('signer', () => {
         await expect(signPsbt(testMnemonic, utxoUnsignedPsbt, network as any)).resolves.toBeTruthy();
       }
       
-      // Invalid network should throw
-      await expect(signPsbt(testMnemonic, utxoUnsignedPsbt, 2 as any)).rejects.toThrow(ValidationError);
+      // Invalid network should throw (using 99 as an invalid network number)
+      await expect(signPsbt(testMnemonic, utxoUnsignedPsbt, 99 as any)).rejects.toThrow(ValidationError);
     });
   });
 });

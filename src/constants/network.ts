@@ -18,6 +18,7 @@ export const COIN_BITCOIN_TESTNET = 1;
 export const NETWORK_MAP = {
   '0': 'mainnet' as const,
   '1': 'testnet' as const,
+  '2': 'testnet' as const, // Alternative testnet number (also maps to testnet)
   '3': 'regtest' as const,
   'signet': 'signet' as const,
   'mainnet': 'mainnet' as const,

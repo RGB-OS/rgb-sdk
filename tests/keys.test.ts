@@ -1,6 +1,15 @@
 // Import from built ESM dist files
 // Using dynamic import to handle WASM modules with experimental flags
-import { generateKeys, deriveKeysFromMnemonic, restoreKeys, ValidationError, CryptoError } from '../dist/index.mjs';
+import { 
+  generateKeys, 
+  deriveKeysFromMnemonic, 
+  restoreKeys,
+  getXprivFromMnemonic,
+  getXpubFromXpriv,
+  deriveKeysFromXpriv,
+  ValidationError, 
+  CryptoError 
+} from '../dist/index.mjs';
 
 describe('keys', () => {
   // Test data from user
@@ -143,6 +152,166 @@ describe('keys', () => {
       expect(keys.mnemonic).toBe(testMnemonic);
       expect(keys.account_xpub_vanilla).toBe(expectedKeys.account_xpub_vanilla);
       expect(keys.master_fingerprint.toLowerCase()).toBe(expectedKeys.master_fingerprint.toLowerCase());
+    });
+  });
+
+  describe('getXprivFromMnemonic', () => {
+    it('should derive xpriv from testnet mnemonic', async () => {
+      const xpriv = await getXprivFromMnemonic('testnet', testMnemonic);
+      
+      // Validate xpriv format (starts with tprv for testnet)
+      expect(xpriv).toMatch(/^tprv/);
+      expect(xpriv.length).toBeGreaterThan(100);
+    });
+
+    it('should derive different xpriv for different networks', async () => {
+      const testnetXpriv = await getXprivFromMnemonic('testnet', testMnemonic);
+      const mainnetXpriv = await getXprivFromMnemonic('mainnet', testMnemonic);
+      
+      // Mainnet and testnet use different BIP32 versions, so xprivs will differ
+      expect(testnetXpriv).not.toBe(mainnetXpriv);
+      expect(testnetXpriv).toMatch(/^tprv/);
+      expect(mainnetXpriv).toMatch(/^xprv/);
+    });
+
+    it('should produce deterministic results', async () => {
+      const xpriv1 = await getXprivFromMnemonic('testnet', testMnemonic);
+      const xpriv2 = await getXprivFromMnemonic('testnet', testMnemonic);
+      
+      expect(xpriv1).toBe(xpriv2);
+    });
+
+    it('should throw ValidationError for empty mnemonic', async () => {
+      await expect(getXprivFromMnemonic('testnet', '')).rejects.toThrow(ValidationError);
+      await expect(getXprivFromMnemonic('testnet', '')).rejects.toThrow('mnemonic');
+    });
+
+    it('should throw ValidationError for invalid mnemonic format', async () => {
+      await expect(getXprivFromMnemonic('testnet', 'invalid mnemonic phrase')).rejects.toThrow(ValidationError);
+    });
+
+    it('should accept network as number', async () => {
+      const xpriv = await getXprivFromMnemonic(2, testMnemonic); // Testnet = 2
+      
+      expect(xpriv).toMatch(/^tprv/);
+    });
+  });
+
+  describe('getXpubFromXpriv', () => {
+    let testXpriv: string;
+
+    beforeAll(async () => {
+      // Derive xpriv from test mnemonic for use in tests
+      testXpriv = await getXprivFromMnemonic('testnet', testMnemonic);
+    });
+
+    it('should derive xpub from xpriv', async () => {
+      const xpub = await getXpubFromXpriv(testXpriv, 'testnet');
+      
+      // Validate xpub format (starts with tpub for testnet)
+      expect(xpub).toMatch(/^tpub/);
+      expect(xpub).toBe(expectedKeys.xpub);
+    });
+
+    it('should produce deterministic results', async () => {
+      const xpub1 = await getXpubFromXpriv(testXpriv, 'testnet');
+      const xpub2 = await getXpubFromXpriv(testXpriv, 'testnet');
+      
+      expect(xpub1).toBe(xpub2);
+      expect(xpub1).toBe(expectedKeys.xpub);
+    });
+
+    it('should throw ValidationError for empty xpriv', async () => {
+      await expect(getXpubFromXpriv('')).rejects.toThrow(ValidationError);
+      await expect(getXpubFromXpriv('')).rejects.toThrow('xpriv');
+    });
+
+    it('should throw CryptoError for invalid xpriv format', async () => {
+      await expect(getXpubFromXpriv('invalid xpriv string')).rejects.toThrow(CryptoError);
+    });
+
+    it('should match xpub from deriveKeysFromMnemonic', async () => {
+      const keys = await deriveKeysFromMnemonic('testnet', testMnemonic);
+      const xpub = await getXpubFromXpriv(testXpriv, 'testnet');
+      
+      expect(xpub).toBe(keys.xpub);
+    });
+  });
+
+  describe('deriveKeysFromXpriv', () => {
+    let testXpriv: string;
+
+    beforeAll(async () => {
+      // Derive xpriv from test mnemonic for use in tests
+      testXpriv = await getXprivFromMnemonic('testnet', testMnemonic);
+    });
+
+    it('should derive correct keys from xpriv', async () => {
+      const keys = await deriveKeysFromXpriv('testnet', testXpriv);
+      
+      // Should match expected keys (except mnemonic which will be empty)
+      expect(keys.xpub).toBe(expectedKeys.xpub);
+      expect(keys.account_xpub_vanilla).toBe(expectedKeys.account_xpub_vanilla);
+      expect(keys.account_xpub_colored).toBe(expectedKeys.account_xpub_colored);
+      expect(keys.master_fingerprint.toLowerCase()).toBe(expectedKeys.master_fingerprint.toLowerCase());
+      console.log(keys);
+      // Mnemonic should be empty when derived from xpriv
+      expect(keys.mnemonic).toBe('');
+    });
+
+    it('should produce same keys as deriveKeysFromMnemonic', async () => {
+      const mnemonicKeys = await deriveKeysFromMnemonic('testnet', testMnemonic);
+      const xprivKeys = await deriveKeysFromXpriv('testnet', testXpriv);
+      
+      // All keys should match except mnemonic
+      expect(xprivKeys.xpub).toBe(mnemonicKeys.xpub);
+      expect(xprivKeys.account_xpub_vanilla).toBe(mnemonicKeys.account_xpub_vanilla);
+      expect(xprivKeys.account_xpub_colored).toBe(mnemonicKeys.account_xpub_colored);
+      expect(xprivKeys.master_fingerprint).toBe(mnemonicKeys.master_fingerprint);
+      
+      // Mnemonic should differ (empty for xpriv, actual mnemonic for mnemonic)
+      expect(xprivKeys.mnemonic).toBe('');
+      expect(mnemonicKeys.mnemonic).toBe(testMnemonic);
+    });
+
+    it('should work with different networks', async () => {
+      const testnetXpriv = await getXprivFromMnemonic('testnet', testMnemonic);
+      const mainnetXpriv = await getXprivFromMnemonic('mainnet', testMnemonic);
+      
+      const testnetKeys = await deriveKeysFromXpriv('testnet', testnetXpriv);
+      const mainnetKeys = await deriveKeysFromXpriv('mainnet', mainnetXpriv);
+      
+      // Mainnet and testnet use different BIP32 versions, so xpubs will differ
+      expect(testnetKeys.account_xpub_vanilla).not.toBe(mainnetKeys.account_xpub_vanilla);
+      
+      // Master fingerprint should be the same (derived from seed, not network)
+      expect(testnetKeys.master_fingerprint).toBe(mainnetKeys.master_fingerprint);
+    });
+
+    it('should produce deterministic results', async () => {
+      const keys1 = await deriveKeysFromXpriv('testnet', testXpriv);
+      const keys2 = await deriveKeysFromXpriv('testnet', testXpriv);
+      
+      expect(keys1.xpub).toBe(keys2.xpub);
+      expect(keys1.account_xpub_vanilla).toBe(keys2.account_xpub_vanilla);
+      expect(keys1.account_xpub_colored).toBe(keys2.account_xpub_colored);
+      expect(keys1.master_fingerprint).toBe(keys2.master_fingerprint);
+    });
+
+    it('should throw ValidationError for empty xpriv', async () => {
+      await expect(deriveKeysFromXpriv('testnet', '')).rejects.toThrow(ValidationError);
+      await expect(deriveKeysFromXpriv('testnet', '')).rejects.toThrow('xpriv');
+    });
+
+    it('should throw CryptoError for invalid xpriv format', async () => {
+      await expect(deriveKeysFromXpriv('testnet', 'invalid xpriv string')).rejects.toThrow(CryptoError);
+    });
+
+    it('should accept network as number', async () => {
+      const keys = await deriveKeysFromXpriv(2, testXpriv); // Testnet = 2
+      
+      expect(keys.account_xpub_vanilla).toMatch(/^tpub/);
+      expect(keys.account_xpub_colored).toMatch(/^tpub/);
     });
   });
 

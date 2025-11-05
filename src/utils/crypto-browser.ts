@@ -1,48 +1,40 @@
-/**
- * Browser-compatible crypto utilities
- * Provides crypto functions that work in both Node.js and browser environments
- */
-
 import { isNode } from './environment';
+import { convertToArrayBuffer } from './crypto-helpers';
 
-/**
- * Create SHA256 hash (browser-compatible)
- */
 export async function sha256(data: Uint8Array | Buffer): Promise<Uint8Array> {
   if (isNode()) {
-    // Use Node.js crypto
-    const { createHash } = await import('node:crypto');
+    // String concatenation prevents bundlers from analyzing the import
+    const nodeCrypto = 'node:' + 'crypto';
+    const { createHash } = await import(nodeCrypto);
     return createHash('sha256').update(data as any).digest();
   } else {
-    // Use Web Crypto API - convert to ArrayBuffer if needed
-    const buffer = data instanceof Uint8Array ? data.buffer : data;
-    const arrayBuffer = buffer instanceof ArrayBuffer ? buffer : buffer.buffer;
-    return new Uint8Array(
-      await crypto.subtle.digest('SHA-256', arrayBuffer)
-    );
+    if (!data) {
+      throw new Error('sha256: data is undefined or null');
+    }
+    const arrayBuffer = convertToArrayBuffer(data);
+    return new Uint8Array(await crypto.subtle.digest('SHA-256', arrayBuffer));
   }
 }
 
 /**
- * Create RIPEMD160 hash (browser-compatible)
- * Note: Web Crypto API doesn't support RIPEMD160, so we need a polyfill
+ * RIPEMD160 hash - uses polyfill in browser (Web Crypto API doesn't support it)
  */
 export async function ripemd160(data: Uint8Array): Promise<Uint8Array> {
   if (isNode()) {
-    // Use Node.js crypto
-    const { createHash } = await import('node:crypto');
+    const nodeCrypto = 'node:' + 'crypto';
+    const { createHash } = await import(nodeCrypto);
     return createHash('ripemd160').update(data).digest();
   } else {
-    // Use polyfill for browser (you'll need to install a RIPEMD160 polyfill)
-    // For now, we'll throw an error suggesting the polyfill
-    throw new Error(
-      'RIPEMD160 requires a polyfill in browser environments. ' +
-      'Please use a library like crypto-js or install a RIPEMD160 polyfill.'
-    );
+    // @ts-ignore - ripemd160 doesn't have type definitions
+    const ripemd160Module = await import('ripemd160');
+    const RIPEMD160 = ripemd160Module.default || ripemd160Module;
+    const BufferPolyfill = (globalThis as any).Buffer || (await import('buffer')).Buffer;
+    const hasher = new (RIPEMD160 as any)();
+    hasher.update(BufferPolyfill.from(data));
+    return new Uint8Array(hasher.digest());
   }
 }
 
-// Import crypto at module level for Node.js (works in both CJS and ESM)
 let nodeCrypto: typeof import('node:crypto') | null = null;
 
 async function getNodeCrypto() {
@@ -50,31 +42,37 @@ async function getNodeCrypto() {
     throw new Error('Node.js crypto is only available in Node.js environment');
   }
   if (!nodeCrypto) {
-    nodeCrypto = await import('node:crypto');
+    const nodeCryptoPath = 'node:' + 'crypto';
+    nodeCrypto = await import(nodeCryptoPath);
   }
   return nodeCrypto;
 }
 
-/**
- * Create SHA256 hash synchronously (Node.js only)
- * For browser, use async sha256() instead
- */
 export async function sha256Sync(data: Uint8Array | Buffer): Promise<Uint8Array> {
   if (!isNode()) {
-    throw new Error('sha256Sync is only available in Node.js. Use sha256() in browsers.');
+    return sha256(data);
+  }
+  if (!data) {
+    throw new Error('sha256Sync: data is undefined');
   }
   const crypto = await getNodeCrypto();
+  if (!crypto) {
+    throw new Error('Node.js crypto is not available');
+  }
   return crypto.createHash('sha256').update(data as any).digest();
 }
 
-/**
- * Create RIPEMD160 hash synchronously (Node.js only)
- * For browser, use async ripemd160() instead
- */
-export const ripemd160Sync: (data: Uint8Array | Buffer) => Promise<Uint8Array> = (data: Uint8Array | Buffer): Promise<Uint8Array> => {
+export const ripemd160Sync: (data: Uint8Array | Buffer) => Promise<Uint8Array> = async (data: Uint8Array | Buffer): Promise<Uint8Array> => {
   if (!isNode()) {
-    throw new Error('ripemd160Sync is only available in Node.js. Use ripemd160() in browsers.');
+    return ripemd160(data);
   }
-  return getNodeCrypto().then(crypto => crypto.createHash('ripemd160').update(data as any).digest());
+  if (!data) {
+    throw new Error('ripemd160Sync: data is undefined');
+  }
+  const crypto = await getNodeCrypto();
+  if (!crypto) {
+    throw new Error('Node.js crypto is not available');
+  }
+  return crypto.createHash('ripemd160').update(data as any).digest();
 };
 

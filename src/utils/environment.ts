@@ -1,11 +1,3 @@
-/**
- * Environment detection utilities
- * Helps determine if code is running in Node.js or browser environment
- */
-
-/**
- * Check if code is running in Node.js environment
- */
 export function isNode(): boolean {
   return (
     typeof process !== 'undefined' &&
@@ -14,9 +6,6 @@ export function isNode(): boolean {
   );
 }
 
-/**
- * Check if code is running in browser environment
- */
 export function isBrowser(): boolean {
   return (
     typeof window !== 'undefined' &&
@@ -24,9 +13,6 @@ export function isBrowser(): boolean {
   );
 }
 
-/**
- * Get the current environment
- */
 export type Environment = 'node' | 'browser' | 'unknown';
 
 export function getEnvironment(): Environment {

@@ -1,28 +1,16 @@
-/**
- * Network utility functions
- */
-
 import type { Network } from '../crypto/types';
 import { NETWORK_MAP } from '../constants';
-import { ValidationError } from '../errors';
+import { validateNetwork } from './validation';
 
 /**
- * Normalize network string or number to Network type
+ * @deprecated Use `normalizeNetwork` from `validation.ts` instead
  */
 export function normalizeNetwork(network: string | number): Network {
+  validateNetwork(network);
   const key = String(network);
-  const normalized = NETWORK_MAP[key as keyof typeof NETWORK_MAP];
-  
-  if (!normalized) {
-    throw new ValidationError(`Invalid network: ${network}`, 'network');
-  }
-  
-  return normalized;
+  return NETWORK_MAP[key as keyof typeof NETWORK_MAP] as Network;
 }
 
-/**
- * Check if value is a valid network
- */
 export function isNetwork(value: unknown): value is Network {
   if (typeof value !== 'string') return false;
   const normalized = NETWORK_MAP[value as keyof typeof NETWORK_MAP];

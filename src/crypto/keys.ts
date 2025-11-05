@@ -23,7 +23,6 @@
  */
 
 import { isNode } from '../utils/environment';
-import { ripemd160Sync, sha256Sync } from '../utils/crypto-browser';
 import type { BIP32Interface } from 'bip32';
 import type { Network } from './types';
 import { ValidationError, CryptoError } from '../errors';
@@ -34,6 +33,8 @@ import {
   COIN_RGB_MAINNET,
   COIN_RGB_TESTNET,
 } from '../constants';
+import { calculateMasterFingerprint } from './utils/fingerprint';
+import { normalizeSeedBuffer, toNetworkName, getNetworkVersions } from './utils/bip32-helpers';
 
 // Dynamic imports for browser compatibility
 let bip39: any;
@@ -44,19 +45,30 @@ let BIP32Factory: any;
 async function loadDependencies() {
   if (isNode()) {
     // Node.js: use createRequire for CommonJS modules
-    const { createRequire } = await import('node:module');
+    // Use dynamic import with string concatenation to prevent bundlers from analyzing it
+    const nodeModule = 'node:' + 'module';
+    const { createRequire } = await import(nodeModule);
     // @ts-ignore - import.meta.url may not be available in CJS build context
     const requireFromModule = createRequire(import.meta.url);
+    
     bip39 = requireFromModule('bip39');
-    ecc = requireFromModule('tiny-secp256k1');
+    ecc = requireFromModule('@bitcoinerlab/secp256k1');
     const bip32 = requireFromModule('bip32');
     BIP32Factory = bip32.BIP32Factory;
   } else {
     // Browser: use ESM imports
     const bip39Module = await import('bip39');
     bip39 = bip39Module.default || bip39Module;
-    const eccModule = await import('tiny-secp256k1');
-    ecc = eccModule;
+    
+    // @bitcoinerlab/secp256k1 - browser-compatible, no WASM issues
+    const eccModule = await import('@bitcoinerlab/secp256k1');
+    // @bitcoinerlab/secp256k1 may export as default or named exports
+    if (eccModule.default) {
+      ecc = eccModule.default;
+    } else {
+      ecc = eccModule as any;
+    }
+    
     const bip32 = await import('bip32');
     BIP32Factory = bip32.BIP32Factory;
   }
@@ -134,17 +146,6 @@ export interface AccountXpubs {
 }
 
 /**
- * Convert network string or number to Network type
- */
-function toNetworkName(bitcoinNetwork: string | number): Network {
-  const n = String(bitcoinNetwork).toLowerCase();
-  if (n.includes('main')) return 'mainnet';
-  if (n.includes('reg')) return 'regtest';
-  if (n.includes('sig')) return 'signet';
-  return 'testnet';
-}
-
-/**
  * Get coin type for derivation path
  */
 function getCoinType(bitcoinNetwork: string | number, rgb: boolean): number {
@@ -153,16 +154,6 @@ function getCoinType(bitcoinNetwork: string | number, rgb: boolean): number {
   return net === 'mainnet' ? 0 : 1;
 }
 
-/**
- * Get network versions for BIP32
- * Returns full Network object expected by BIP32: { bip32: { public, private }, wif }
- */
-function getNetworkVersions(bitcoinNetwork: string | number): NetworkVersions {
-  const net = toNetworkName(bitcoinNetwork);
-  const versions = NETWORKS[net];
-  if (!versions) throw new Error(`Unsupported network: ${bitcoinNetwork}`);
-  return versions;
-}
 
 /**
  * Generate account derivation path: m / 86' / coinType' / 0'
@@ -174,16 +165,10 @@ function accountDerivationPath(bitcoinNetwork: string | number, rgb: boolean): s
 
 /**
  * Calculate master fingerprint from BIP32 node
- * fingerprint = first 4 bytes of HASH160(pubkey)
+ * Alias for shared fingerprint calculation utility
  */
 async function masterFingerprintFromNode(node: BIP32Interface): Promise<string> {
-  const pubkey = node.publicKey;
-  const sha = await sha256Sync(pubkey);
-  // Workaround for TypeScript DTS build type resolution issue
-  const ripemd160Fn = ripemd160Sync as (data: Uint8Array | Buffer) => Promise<Uint8Array>;
-  const ripe = await ripemd160Fn(sha as Uint8Array);
-  // @ts-ignore
-  return ripe.subarray(0, 4).toString('hex');
+  return calculateMasterFingerprint(node);
 }
 
 /**
@@ -191,10 +176,30 @@ async function masterFingerprintFromNode(node: BIP32Interface): Promise<string> 
  */
 async function mnemonicToRoot(mnemonic: string, bitcoinNetwork: string | number): Promise<BIP32Interface> {
   await ensureDependencies();
+  
+  // Check if bip39 is loaded correctly
+  if (!bip39 || typeof bip39.mnemonicToSeedSync !== 'function') {
+    throw new CryptoError('bip39 module not loaded correctly');
+  }
+  
   const seed = bip39.mnemonicToSeedSync(mnemonic);
+  
+  // Normalize seed buffer using shared utility
+  const seedBuffer = normalizeSeedBuffer(seed);
+  
   const versions = getNetworkVersions(bitcoinNetwork);
+  
+  if (!ecc || typeof ecc !== 'object') {
+    throw new CryptoError(`ecc module is not loaded correctly: type = ${typeof ecc}`);
+  }
+  
   const bip32 = BIP32Factory(ecc);
-  return bip32.fromSeed(seed, versions);
+  
+  try {
+    return bip32.fromSeed(seedBuffer, versions);
+  } catch (error) {
+    throw new CryptoError(`Failed to create BIP32 root node from seed: ${error instanceof Error ? error.message : String(error)}`, error as Error);
+  }
 }
 
 /**
@@ -216,7 +221,51 @@ async function getMasterXpub(mnemonic: string, bitcoinNetwork: string | number):
 }
 
 /**
- * Build complete keys output object
+ * Get master extended private key (xpriv) from mnemonic
+ */
+async function getMasterXpriv(mnemonic: string, bitcoinNetwork: string | number): Promise<string> {
+  const root = await mnemonicToRoot(mnemonic, bitcoinNetwork);
+  return root.toBase58();
+}
+
+/**
+ * Get extended public key (xpub) from extended private key (xpriv)
+ * Internal helper function
+ */
+async function getXpubFromXprivInternal(xpriv: string, bitcoinNetwork?: string | number): Promise<string> {
+  await ensureDependencies();
+  
+  if (!BIP32Factory || !ecc) {
+    throw new CryptoError('BIP32Factory or ECC not loaded');
+  }
+  
+  try {
+    // BIP32Factory is a factory function that returns BIP32 interface
+    // Use it to create a BIP32 instance from the xpriv
+    const bip32 = BIP32Factory(ecc);
+    
+    // fromBase58 requires network versions for validation
+    // If network is not provided, try to infer from xpriv prefix (xprv/tprv for mainnet/testnet)
+    let node;
+    if (bitcoinNetwork) {
+      const versions = getNetworkVersions(bitcoinNetwork);
+      node = bip32.fromBase58(xpriv, versions);
+    } else {
+      // Try to infer network from xpriv prefix
+      // xprv = mainnet, tprv = testnet/regtest
+      const inferredNetwork = xpriv.startsWith('xprv') ? 'mainnet' : 'testnet';
+      const versions = getNetworkVersions(inferredNetwork);
+      node = bip32.fromBase58(xpriv, versions);
+    }
+    
+    return node.neutered().toBase58();
+  } catch (error) {
+    throw new CryptoError('Failed to derive xpub from xpriv', error as Error);
+  }
+}
+
+/**
+ * Build complete keys output object from mnemonic
  */
 async function buildKeysOutput(mnemonic: string, bitcoinNetwork: string | number): Promise<GeneratedKeys> {
   const root = await mnemonicToRoot(mnemonic, bitcoinNetwork);
@@ -233,6 +282,46 @@ async function buildKeysOutput(mnemonic: string, bitcoinNetwork: string | number
     account_xpub_colored,
     master_fingerprint
   };
+}
+
+/**
+ * Build complete keys output object from xpriv
+ */
+async function buildKeysOutputFromXpriv(xpriv: string, bitcoinNetwork: string | number): Promise<GeneratedKeys> {
+  await ensureDependencies();
+  
+  if (!BIP32Factory || !ecc) {
+    throw new CryptoError('BIP32Factory or ECC not loaded');
+  }
+  
+  try {
+    // BIP32Factory is a factory function that returns BIP32 interface
+    const bip32 = BIP32Factory(ecc);
+    
+    // Get network versions for validation
+    const versions = getNetworkVersions(bitcoinNetwork);
+    const root = bip32.fromBase58(xpriv, versions);
+    
+    const xpub = root.neutered().toBase58();
+    const master_fingerprint = await masterFingerprintFromNode(root);
+    
+    const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
+    const vanillaPath = accountDerivationPath(normalizedNetwork, false);
+    const coloredPath = accountDerivationPath(normalizedNetwork, true);
+    
+    const account_xpub_vanilla = root.derivePath(vanillaPath).neutered().toBase58();
+    const account_xpub_colored = root.derivePath(coloredPath).neutered().toBase58();
+    
+    return {
+      mnemonic: '', // Not available from xpriv
+      xpub,
+      account_xpub_vanilla,
+      account_xpub_colored,
+      master_fingerprint
+    };
+  } catch (error) {
+    throw new CryptoError('Failed to derive keys from xpriv', error as Error);
+  }
 }
 
 /**
@@ -294,12 +383,18 @@ export async function deriveKeysFromMnemonic(
 ): Promise<GeneratedKeys> {
   validateMnemonic(mnemonic, 'mnemonic');
   
+  const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
+  
   try {
     await ensureDependencies();
-    if (!bip39.validateMnemonic(mnemonic)) {
+    console.log('mnemonic', mnemonic);
+    const trimmedMnemonic = mnemonic.trim();
+    if (!bip39.validateMnemonic(trimmedMnemonic)) {
+      console.log('trimmedMnemonic', trimmedMnemonic);
       throw new ValidationError('Invalid mnemonic format - failed BIP39 validation', 'mnemonic');
     }
-    return await buildKeysOutput(mnemonic.trim(), bitcoinNetwork);
+    
+    return await buildKeysOutput(trimmedMnemonic, normalizedNetwork);
   } catch (error) {
     if (error instanceof ValidationError) {
       throw error;
@@ -336,6 +431,103 @@ export async function restoreKeys(
  * console.log('Colored XPub:', xpubs.account_xpub_colored);
  * ```
  */
+/**
+ * Get master extended private key (xpriv) from mnemonic
+ * 
+ * @param bitcoinNetwork - Network string or number (default: 'regtest')
+ * @param mnemonic - BIP39 mnemonic phrase (12 or 24 words)
+ * @returns Promise resolving to master xpriv (extended private key)
+ * @throws {ValidationError} If mnemonic is invalid
+ * @throws {CryptoError} If key derivation fails
+ * 
+ * @example
+ * ```typescript
+ * const xpriv = await getXprivFromMnemonic('testnet', 'your mnemonic phrase here');
+ * console.log('Master xpriv:', xpriv);
+ * ```
+ */
+export async function getXprivFromMnemonic(
+  bitcoinNetwork: string | number = 'regtest',
+  mnemonic: string
+): Promise<string> {
+  validateMnemonic(mnemonic, 'mnemonic');
+  const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
+  
+  try {
+    return await getMasterXpriv(mnemonic, normalizedNetwork);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    throw new CryptoError('Failed to derive xpriv from mnemonic', error as Error);
+  }
+}
+
+/**
+ * Get extended public key (xpub) from extended private key (xpriv)
+ * 
+ * @param xpriv - Extended private key (base58 encoded)
+ * @returns Promise resolving to xpub (extended public key)
+ * @throws {CryptoError} If xpriv is invalid or derivation fails
+ * 
+ * @example
+ * ```typescript
+ * const xpub = await getXpubFromXpriv('xprv...');
+ * console.log('xpub:', xpub);
+ * ```
+ */
+export async function getXpubFromXpriv(xpriv: string, bitcoinNetwork?: string | number): Promise<string> {
+  if (!xpriv || typeof xpriv !== 'string') {
+    throw new ValidationError('xpriv must be a non-empty string', 'xpriv');
+  }
+  
+  try {
+    return await getXpubFromXprivInternal(xpriv, bitcoinNetwork);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    throw new CryptoError('Failed to derive xpub from xpriv', error as Error);
+  }
+}
+
+/**
+ * Derive wallet keys from extended private key (xpriv)
+ * Similar to deriveKeysFromMnemonic but starts from xpriv instead of mnemonic
+ * 
+ * @param bitcoinNetwork - Network string or number (default: 'regtest')
+ * @param xpriv - Extended private key (base58 encoded)
+ * @returns Promise resolving to generated keys (without mnemonic)
+ * @throws {ValidationError} If xpriv is invalid
+ * @throws {CryptoError} If key derivation fails
+ * 
+ * @example
+ * ```typescript
+ * const keys = await deriveKeysFromXpriv('testnet', 'xprv...');
+ * console.log('Master Fingerprint:', keys.master_fingerprint);
+ * console.log('Account xpub vanilla:', keys.account_xpub_vanilla);
+ * ```
+ */
+export async function deriveKeysFromXpriv(
+  bitcoinNetwork: string | number = 'regtest',
+  xpriv: string
+): Promise<GeneratedKeys> {
+  if (!xpriv || typeof xpriv !== 'string') {
+    throw new ValidationError('xpriv must be a non-empty string', 'xpriv');
+  }
+  
+  const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
+  
+  try {
+    return await buildKeysOutputFromXpriv(xpriv, normalizedNetwork);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    throw new CryptoError('Failed to derive keys from xpriv', error as Error);
+  }
+}
+
 export async function accountXpubsFromMnemonic(
   bitcoinNetwork: string | number = 'regtest',
   mnemonic: string

@@ -13,7 +13,15 @@ export { signPsbt, signPsbtSync } from './signer';
 export type { SignPsbtOptions } from './signer';
 
 // Export key functions
-export { generateKeys, deriveKeysFromMnemonic, restoreKeys, accountXpubsFromMnemonic } from './keys';
+export { 
+  generateKeys, 
+  deriveKeysFromMnemonic, 
+  restoreKeys, 
+  accountXpubsFromMnemonic,
+  getXprivFromMnemonic,
+  getXpubFromXpriv,
+  deriveKeysFromXpriv
+} from './keys';
 export type { GeneratedKeys, AccountXpubs } from './keys';
 
 // Export types
