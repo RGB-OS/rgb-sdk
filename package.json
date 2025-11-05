@@ -25,8 +25,6 @@
     "test": "npm run build && NODE_OPTIONS='--experimental-vm-modules' jest",
     "test:watch": "npm run build && NODE_OPTIONS='--experimental-vm-modules' jest --watch",
     "test:coverage": "npm run build && NODE_OPTIONS='--experimental-vm-modules' jest --coverage",
-    "test:browser": "npm run build && NODE_OPTIONS='--experimental-vm-modules' jest tests/browser.test.ts",
-    "test:browser:serve": "npm run build && npx http-server -p 8000 -o tests/browser-test.html",
     "version:patch": "npm version patch && git push && git push --tags && npm publish --access public",
     "version:minor": "npm version minor && git push && git push --tags && npm publish --access public",
     "version:major": "npm version major && git push && git push --tags && npm publish --access public",

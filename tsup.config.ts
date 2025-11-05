@@ -13,5 +13,4 @@ export default defineConfig({
   outExtension: ({ format }) => ({
     js: format === 'cjs' ? '.cjs' : '.mjs'
   }),
-\
 });

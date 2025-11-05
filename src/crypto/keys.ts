@@ -35,42 +35,43 @@ import {
 } from '../constants';
 import { calculateMasterFingerprint } from './utils/fingerprint';
 import { normalizeSeedBuffer, toNetworkName, getNetworkVersions } from './utils/bip32-helpers';
+import type { BIP39Module, ECCModule, BIP32Factory } from './types';
 
 // Dynamic imports for browser compatibility
-let bip39: any;
-let ecc: any;
-let BIP32Factory: any;
+let bip39: BIP39Module | undefined;
+let ecc: ECCModule | undefined;
+let BIP32FactoryInstance: BIP32Factory | undefined;
 
 // Load dependencies based on environment
 async function loadDependencies() {
   if (isNode()) {
     // Node.js: use createRequire for CommonJS modules
     // Use dynamic import with string concatenation to prevent bundlers from analyzing it
-    const nodeModule = 'node:' + 'module';
+    const nodeModule = 'node:module';
     const { createRequire } = await import(nodeModule);
-    // @ts-ignore - import.meta.url may not be available in CJS build context
+    // @ts-ignore - import.meta.url not available in CJS build context
     const requireFromModule = createRequire(import.meta.url);
     
-    bip39 = requireFromModule('bip39');
-    ecc = requireFromModule('@bitcoinerlab/secp256k1');
-    const bip32 = requireFromModule('bip32');
-    BIP32Factory = bip32.BIP32Factory;
+    bip39 = requireFromModule('bip39') as unknown as BIP39Module;
+    ecc = requireFromModule('@bitcoinerlab/secp256k1') as unknown as ECCModule;
+    const bip32 = requireFromModule('bip32') as unknown as { BIP32Factory: BIP32Factory };
+    BIP32FactoryInstance = bip32.BIP32Factory;
   } else {
     // Browser: use ESM imports
     const bip39Module = await import('bip39');
-    bip39 = bip39Module.default || bip39Module;
+    bip39 = (bip39Module.default as unknown as BIP39Module) || (bip39Module as unknown as BIP39Module);
     
     // @bitcoinerlab/secp256k1 - browser-compatible, no WASM issues
     const eccModule = await import('@bitcoinerlab/secp256k1');
     // @bitcoinerlab/secp256k1 may export as default or named exports
     if (eccModule.default) {
-      ecc = eccModule.default;
+      ecc = eccModule.default as unknown as ECCModule;
     } else {
-      ecc = eccModule as any;
+      ecc = eccModule as unknown as ECCModule;
     }
     
-    const bip32 = await import('bip32');
-    BIP32Factory = bip32.BIP32Factory;
+    const bip32 = await import('bip32') as unknown as { BIP32Factory: BIP32Factory };
+    BIP32FactoryInstance = bip32.BIP32Factory;
   }
 }
 
@@ -130,8 +131,6 @@ const NETWORKS: Record<Network, NetworkVersions> = {
   }
 };
 
-// Use constants directly from constants module (no local aliases)
-
 export interface GeneratedKeys {
   mnemonic: string;
   xpub: string;
@@ -182,18 +181,18 @@ async function mnemonicToRoot(mnemonic: string, bitcoinNetwork: string | number)
     throw new CryptoError('bip39 module not loaded correctly');
   }
   
-  const seed = bip39.mnemonicToSeedSync(mnemonic);
+  const seed = bip39!.mnemonicToSeedSync(mnemonic);
   
   // Normalize seed buffer using shared utility
   const seedBuffer = normalizeSeedBuffer(seed);
   
   const versions = getNetworkVersions(bitcoinNetwork);
   
-  if (!ecc || typeof ecc !== 'object') {
-    throw new CryptoError(`ecc module is not loaded correctly: type = ${typeof ecc}`);
+  if (!ecc || !BIP32FactoryInstance) {
+    throw new CryptoError('ECC or BIP32Factory not loaded');
   }
   
-  const bip32 = BIP32Factory(ecc);
+  const bip32 = BIP32FactoryInstance(ecc);
   
   try {
     return bip32.fromSeed(seedBuffer, versions);
@@ -235,14 +234,14 @@ async function getMasterXpriv(mnemonic: string, bitcoinNetwork: string | number)
 async function getXpubFromXprivInternal(xpriv: string, bitcoinNetwork?: string | number): Promise<string> {
   await ensureDependencies();
   
-  if (!BIP32Factory || !ecc) {
-    throw new CryptoError('BIP32Factory or ECC not loaded');
+  if (!ecc || !BIP32FactoryInstance) {
+    throw new CryptoError('ECC or BIP32Factory not loaded');
   }
   
   try {
     // BIP32Factory is a factory function that returns BIP32 interface
     // Use it to create a BIP32 instance from the xpriv
-    const bip32 = BIP32Factory(ecc);
+    const bip32 = BIP32FactoryInstance(ecc);
     
     // fromBase58 requires network versions for validation
     // If network is not provided, try to infer from xpriv prefix (xprv/tprv for mainnet/testnet)
@@ -290,13 +289,13 @@ async function buildKeysOutput(mnemonic: string, bitcoinNetwork: string | number
 async function buildKeysOutputFromXpriv(xpriv: string, bitcoinNetwork: string | number): Promise<GeneratedKeys> {
   await ensureDependencies();
   
-  if (!BIP32Factory || !ecc) {
+  if (!BIP32FactoryInstance || !ecc) {
     throw new CryptoError('BIP32Factory or ECC not loaded');
   }
   
   try {
     // BIP32Factory is a factory function that returns BIP32 interface
-    const bip32 = BIP32Factory(ecc);
+    const bip32 = BIP32FactoryInstance(ecc);
     
     // Get network versions for validation
     const versions = getNetworkVersions(bitcoinNetwork);
@@ -342,10 +341,10 @@ async function buildKeysOutputFromXpriv(xpriv: string, bitcoinNetwork: string | 
 export async function generateKeys(bitcoinNetwork: string | number = 'regtest'): Promise<GeneratedKeys> {
   try {
     await ensureDependencies();
-    if (!bip39 || typeof bip39.generateMnemonic !== 'function') {
+    if (!bip39 || typeof (bip39 as any).generateMnemonic !== 'function') {
       throw new Error('bip39 not loaded. Dependencies may not have initialized correctly.');
     }
-    const mnemonic = bip39.generateMnemonic(128);
+    const mnemonic = (bip39 as any).generateMnemonic(128);
     return await buildKeysOutput(mnemonic, bitcoinNetwork);
   } catch (error) {
     if (error instanceof Error && error.message.includes('bip39 not loaded')) {
@@ -389,7 +388,7 @@ export async function deriveKeysFromMnemonic(
     await ensureDependencies();
     console.log('mnemonic', mnemonic);
     const trimmedMnemonic = mnemonic.trim();
-    if (!bip39.validateMnemonic(trimmedMnemonic)) {
+    if (!bip39 || !bip39.validateMnemonic(trimmedMnemonic)) {
       console.log('trimmedMnemonic', trimmedMnemonic);
       throw new ValidationError('Invalid mnemonic format - failed BIP39 validation', 'mnemonic');
     }
@@ -534,13 +533,9 @@ export async function accountXpubsFromMnemonic(
 ): Promise<AccountXpubs> {
   validateMnemonic(mnemonic, 'mnemonic');
   
-  if (!bip39.validateMnemonic(mnemonic)) {
-    throw new ValidationError('Invalid mnemonic format - failed BIP39 validation', 'mnemonic');
-  }
-  
   try {
     await ensureDependencies();
-    if (!bip39.validateMnemonic(mnemonic)) {
+    if (!bip39 || !bip39.validateMnemonic(mnemonic)) {
       throw new ValidationError('Invalid mnemonic format - failed BIP39 validation', 'mnemonic');
     }
     return {

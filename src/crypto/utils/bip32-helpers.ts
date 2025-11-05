@@ -1,6 +1,6 @@
 import { isNode } from '../../utils/environment';
 import { CryptoError } from '../../errors';
-import type { Network, NetworkVersions } from '../types';
+import type { Network, NetworkVersions, BufferLike } from '../types';
 import { BIP32_VERSIONS } from '../../constants/network';
 
 function getWifVersion(network: Network): number {
@@ -19,7 +19,7 @@ function getNetworkVersionsFromConstants(network: Network): NetworkVersions {
  * Normalize seed to Buffer/Uint8Array for BIP32 operations
  * Handles Buffer, Uint8Array, ArrayBuffer, and buffer-like objects
  */
-export function normalizeSeedBuffer(seed: any): Buffer | Uint8Array {
+export function normalizeSeedBuffer(seed: BufferLike): Buffer | Uint8Array {
   if (!seed) {
     throw new CryptoError('Failed to generate seed - seed is undefined');
   }
@@ -31,27 +31,27 @@ export function normalizeSeedBuffer(seed: any): Buffer | Uint8Array {
   } else if (seed instanceof ArrayBuffer) {
     seedBuffer = new Uint8Array(seed);
   } else if (seed && typeof seed === 'object') {
-    if ('buffer' in seed) {
-      const bufferValue = (seed as any).buffer;
+    if ('buffer' in seed && seed.buffer) {
+      const bufferValue = seed.buffer;
       
-      if (bufferValue && bufferValue instanceof ArrayBuffer) {
+      if (bufferValue instanceof ArrayBuffer) {
         if (isNode() && seed instanceof Buffer) {
           seedBuffer = seed as Buffer;
         } else {
-          const byteOffset = (seed as any).byteOffset || 0;
-          const byteLength = (seed as any).byteLength || (seed as any).length || bufferValue.byteLength;
+          const byteOffset = seed.byteOffset || 0;
+          const byteLength = seed.byteLength || (seed as { length?: number }).length || bufferValue.byteLength;
           seedBuffer = new Uint8Array(bufferValue, byteOffset, byteLength);
         }
       } else {
         try {
-          seedBuffer = new Uint8Array(seed as any);
+          seedBuffer = new Uint8Array(seed as ArrayLike<number>);
         } catch (error) {
           throw new CryptoError(`Failed to convert seed to Uint8Array (buffer property invalid): ${error instanceof Error ? error.message : String(error)}`);
         }
       }
     } else {
       try {
-        seedBuffer = new Uint8Array(seed as any);
+        seedBuffer = new Uint8Array(seed as ArrayLike<number>);
       } catch (error) {
         throw new CryptoError(`Failed to convert seed to Uint8Array: ${error instanceof Error ? error.message : String(error)}`);
       }

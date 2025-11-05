@@ -10,7 +10,6 @@
 //   const signedPsbt = signPsbt(mnemonic, psbtBase64, 'testnet');
 
 import { isNode } from '../utils/environment';
-import { sha256Sync } from '../utils/crypto-browser';
 import type { BIP32Interface } from 'bip32';
 import type { Psbt as BitcoinJsPsbt, Network as BitcoinJsNetwork } from 'bitcoinjs-lib';
 import { ValidationError, CryptoError } from '../errors';
@@ -25,83 +24,94 @@ import {
   COIN_BITCOIN_TESTNET,
   COIN_BITCOIN_MAINNET,
 } from '../constants';
-import type { Network, PsbtType, NetworkVersions, Descriptors } from './types';
+import type { 
+  Network, 
+  PsbtType, 
+  NetworkVersions, 
+  Descriptors,
+  BDKModule,
+  BDKInit,
+  BIP39Module,
+  ECCModule,
+  BIP32Factory,
+  BitcoinJsPayments,
+  BitcoinJsNetworks,
+  BIP341Module,
+  BDKWallet,
+  BDKPsbt,
+  BDKNetwork,
+  BDKSignOptions
+} from './types';
 import { calculateMasterFingerprint } from './utils/fingerprint';
 import { getNetworkVersions as getBIP32NetworkVersions, normalizeSeedBuffer } from './utils/bip32-helpers';
 
-// BDK types - will be loaded dynamically based on environment
-type BDKModule = {
-  Wallet: {
-    create: (network: any, external: string, internal: string) => any;
-  };
-  Psbt: {
-    from_string: (psbt: string) => any;
-  };
-  SignOptions: new () => any;
-};
-
 // Dynamic imports for browser compatibility
-let bip39: any;
-let ecc: any;
-let BIP32Factory: any;
-let Psbt: any;
-let payments: any;
-let networks: any;
-let toXOnly: any;
-let bdk: BDKModule;
-let init: any;
+let bip39: BIP39Module | undefined;
+let ecc: ECCModule | undefined;
+let BIP32FactoryInstance: BIP32Factory | undefined;
+let Psbt: typeof import('bitcoinjs-lib').Psbt | undefined;
+let payments: BitcoinJsPayments | undefined;
+let networks: BitcoinJsNetworks | undefined;
+let toXOnly: ((pubkey: Buffer) => Buffer) | undefined;
+let bdk: BDKModule | undefined;
+let init: BDKInit | undefined;
 
 // Load dependencies based on environment
-async function loadDependencies() {
-  // Load BDK wallet module based on environment
+async function loadDependencies(): Promise<void> {
   if (isNode()) {
     // Node.js: use @bitcoindevkit/bdk-wallet-node
     const bdkNode = await import('@bitcoindevkit/bdk-wallet-node');
     // BDK packages export init function as default or named export
-    init = bdkNode.default || (bdkNode as any).init || bdkNode;
-    bdk = bdkNode as any;
-    
-    // Node.js: use createRequire for CommonJS modules
+    init = (bdkNode.default as unknown as BDKInit) || ((bdkNode as { init?: unknown }).init as BDKInit) || (bdkNode as unknown as BDKInit);
+    bdk = bdkNode as unknown as BDKModule;
     // Use dynamic import with string concatenation to prevent bundlers from analyzing it
     const nodeModule = 'node:' + 'module';
     const { createRequire } = await import(nodeModule);
-    // @ts-ignore - import.meta.url may not be available in CJS build context
+    // @ts-ignore - import.meta.url not available in CJS build context
     const requireFromModule = createRequire(import.meta.url);
-    bip39 = requireFromModule('bip39');
-    ecc = requireFromModule('@bitcoinerlab/secp256k1');
-    const bip32 = requireFromModule('bip32');
-    BIP32Factory = bip32.BIP32Factory;
-    const bitcoinjs = requireFromModule('bitcoinjs-lib');
+    bip39 = requireFromModule('bip39') as unknown as BIP39Module;
+    ecc = requireFromModule('@bitcoinerlab/secp256k1') as unknown as ECCModule;
+    const bip32 = requireFromModule('bip32') as unknown as { BIP32Factory: BIP32Factory };
+    BIP32FactoryInstance = bip32.BIP32Factory;
+    const bitcoinjs = requireFromModule('bitcoinjs-lib') as unknown as {
+      Psbt: typeof import('bitcoinjs-lib').Psbt;
+      payments: BitcoinJsPayments;
+      networks: BitcoinJsNetworks;
+    };
     Psbt = bitcoinjs.Psbt;
     payments = bitcoinjs.payments;
     networks = bitcoinjs.networks;
-    toXOnly = requireFromModule('bitcoinjs-lib/src/payments/bip341.js');
+    const bip341 = requireFromModule('bitcoinjs-lib/src/payments/bip341.js') as unknown as BIP341Module;
+    toXOnly = bip341.toXOnly || ((pubkey: Buffer) => Buffer.from(pubkey.slice(1)));
   } else {
-    // Browser: use @bitcoindevkit/bdk-wallet-web
     const bdkWeb = await import('@bitcoindevkit/bdk-wallet-web');
-    // BDK packages export init function as default or named export
-    init = (bdkWeb as any).default || (bdkWeb as any).init || bdkWeb;
-    bdk = bdkWeb as any;
+
+    init = ((bdkWeb as { default?: unknown }).default as BDKInit) || ((bdkWeb as { init?: unknown }).init as BDKInit) || (bdkWeb as unknown as BDKInit);
+    bdk = bdkWeb as unknown as BDKModule;
     
     // Browser: use ESM imports
     const bip39Module = await import('bip39');
-    bip39 = bip39Module.default || bip39Module;
-    // @bitcoinerlab/secp256k1 - browser-compatible, no WASM issues
+    bip39 = (bip39Module.default as BIP39Module) || (bip39Module as BIP39Module);
+
     const eccModule = await import('@bitcoinerlab/secp256k1');
-    // @bitcoinerlab/secp256k1 may export as default or named exports
+   
     if (eccModule.default) {
-      ecc = eccModule.default;
+      ecc = eccModule.default as unknown as ECCModule;
     } else {
-      ecc = eccModule as any;
+      ecc = eccModule as unknown as ECCModule;
     }
-    const bip32 = await import('bip32');
-    BIP32Factory = bip32.BIP32Factory;
-    const bitcoinjs = await import('bitcoinjs-lib');
+    const bip32 = await import('bip32') as unknown as { BIP32Factory: BIP32Factory };
+    BIP32FactoryInstance = bip32.BIP32Factory;
+    const bitcoinjs = await import('bitcoinjs-lib') as unknown as {
+      Psbt: typeof import('bitcoinjs-lib').Psbt;
+      payments: BitcoinJsPayments;
+      networks: BitcoinJsNetworks;
+    };
     Psbt = bitcoinjs.Psbt;
     payments = bitcoinjs.payments;
     networks = bitcoinjs.networks;
-    const bip341 = await import('bitcoinjs-lib/src/payments/bip341.js');
-    toXOnly = (bip341 as any).toXOnly;
+    const bip341 = await import('bitcoinjs-lib/src/payments/bip341.js') as unknown as BIP341Module;
+    toXOnly = bip341.toXOnly || ((pubkey: Buffer) => Buffer.from(pubkey.slice(1)));
   }
 }
 
@@ -109,35 +119,15 @@ async function loadDependencies() {
 let dependenciesLoaded = false;
 if (isNode()) {
   loadDependencies().then(async () => {
-    // Initialize BDK WASM module (required for both node and web versions)
-    // The init function must be called before using any BDK functionality
-    if (init) {
-      if (typeof init === 'function') {
-        await init();
-      } else if (init.init && typeof init.init === 'function') {
-        await init.init();
-      }
-    }
     dependenciesLoaded = true;
   }).catch(() => {
-    // Will be loaded on first use
+    throw new CryptoError('Failed to load dependencies');
   });
 }
 
 async function ensureDependencies() {
   if (!dependenciesLoaded) {
-    await loadDependencies();
-    
-    // Initialize BDK WASM module (required for both node and web versions)
-    // The init function must be called before using any BDK functionality
-    if (init) {
-      if (typeof init === 'function') {
-        await init();
-      } else if (init.init && typeof init.init === 'function') {
-        await init.init();
-      }
-    }
-    
+    await loadDependencies();    
     dependenciesLoaded = true;
   }
 }
@@ -146,7 +136,7 @@ async function ensureDependencies() {
 export type { Network, PsbtType, NetworkVersions, Descriptors } from './types';
 
 export interface SignPsbtOptions {
-  signOptions?: any; // BDK SignOptions type (loaded dynamically)
+  signOptions?: BDKSignOptions;
   preprocess?: boolean;
 }
 
@@ -193,7 +183,7 @@ function pathToString(path: DerivationPath): string {
 }
 
 /**
- * Preprocessing for send_begin PSBTs: Fixes RGB PSBT metadata so BDK can match inputs.
+ * Preprocessing for send_begin PSBTs: Update RGB PSBT metadata to BDK can match inputs.
  */
 function preprocessPsbtForBDK(
   psbtBase64: string,
@@ -201,15 +191,17 @@ function preprocessPsbtForBDK(
   fp: string,
   network: Network
 ): string {
-  const psbt = Psbt.fromBase64(psbtBase64.trim()) as BitcoinJsPsbt;
-  const bjsNet: BitcoinJsNetwork = network === 'mainnet' ? networks.bitcoin : networks.testnet;
+  if (!Psbt || !networks) {
+    throw new CryptoError('BitcoinJS modules not loaded');
+  }
+  const psbt = Psbt!.fromBase64(psbtBase64.trim()) as BitcoinJsPsbt;
+  const bjsNet: BitcoinJsNetwork = network === 'mainnet' ? networks!.bitcoin : networks!.testnet;
   
   for (let i = 0; i < psbt.inputCount; i++) {
     const input = psbt.data.inputs[i];
     
     if (input.tapBip32Derivation && input.tapBip32Derivation.length > 0) {
       input.tapBip32Derivation.forEach((deriv) => {
-        // Normalize path and ensure it's a string
         const normalizedPath = normalizePath(deriv.path as DerivationPath);
         deriv.path = pathToString(normalizedPath);
         let pathStr = pathToString(normalizedPath);
@@ -218,10 +210,17 @@ function preprocessPsbtForBDK(
           pathStr = 'm/' + pathStr;
         }
         
-        // Derive expected script from path
         try {
+          if (!toXOnly || !payments) {
+            return;
+          }
           const derivedNode = rootNode.derivePath(pathStr);
-          const xOnly = toXOnly(derivedNode.publicKey);
+          const pubkey = derivedNode.publicKey;
+          if (!pubkey) {
+            return;
+          }
+          const pubkeyBuffer = pubkey instanceof Buffer ? pubkey : Buffer.from(pubkey);
+          const xOnly = toXOnly!(pubkeyBuffer);
           const p2tr = payments.p2tr({ internalPubkey: xOnly, network: bjsNet });
           const expectedScript = p2tr.output;
           
@@ -244,7 +243,7 @@ function preprocessPsbtForBDK(
             }
           }
           
-          // Fix master fingerprint
+          // Update master fingerprint
           const fingerprintBuf = Buffer.from(fp, 'hex');
           if (!deriv.masterFingerprint) {
             deriv.masterFingerprint = fingerprintBuf;
@@ -255,17 +254,17 @@ function preprocessPsbtForBDK(
             }
           }
           
-          // Fix pubkey in derivation
+          // Update pubkey in derivation
           if (!deriv.pubkey || !deriv.pubkey.equals(xOnly)) {
             deriv.pubkey = xOnly;
           }
         } catch (e) {
-          // Skip this derivation if we can't derive from path
+          // Skip this derivation if it can't be derived from path
         }
       });
-    }
+    } 
     
-    // Fix legacy bip32Derivation if needed
+    // Update legacy bip32Derivation if needed
     if (input.bip32Derivation && input.bip32Derivation.length > 0) {
       input.bip32Derivation.forEach((deriv) => {
         const normalizedPath = normalizePath(deriv.path as DerivationPath);
@@ -282,6 +281,9 @@ function preprocessPsbtForBDK(
  * @returns {'create_utxo'|'send'} PSBT type
  */
 function detectPsbtType(psbtBase64: string): PsbtType {
+  if (!Psbt) {
+    throw new CryptoError('BitcoinJS Psbt module not loaded');
+  }
   try {
     const psbt = Psbt.fromBase64(psbtBase64.trim()) as BitcoinJsPsbt;
     for (let i = 0; i < psbt.inputCount; i++) {
@@ -401,21 +403,24 @@ export async function signPsbt(
     validatePsbt(psbtBase64, 'psbtBase64');
     const normalizedNetwork = normalizeNetwork(network);
     
+    // Ensure modules are loaded
+    if (!bip39 || !ecc || !BIP32FactoryInstance || !bdk) {
+      throw new CryptoError('Dependencies not loaded');
+    }
+    
     // Derive root node and master fingerprint
-    const bip32 = BIP32Factory(ecc);
-    let seed: any;
+    const bip32 = BIP32FactoryInstance(ecc);
+    let seed: Buffer;
     try {
-      seed = bip39.mnemonicToSeedSync(mnemonic);
+      seed = bip39!.mnemonicToSeedSync(mnemonic);
     } catch (error) {
       throw new ValidationError('Invalid mnemonic format', 'mnemonic');
     }
     
-    // Normalize seed buffer using shared utility
     const seedBuffer = normalizeSeedBuffer(seed);
     const versions = getNetworkVersions(normalizedNetwork);
     let rootNode: BIP32Interface;
     try {
-      // BIP32 expects full Network object: { bip32: { public, private }, wif }
       rootNode = bip32.fromSeed(seedBuffer, versions);
     } catch (error) {
       throw new CryptoError('Failed to derive root node from seed', error as Error);
@@ -423,17 +428,15 @@ export async function signPsbt(
     
     const fp = await getMasterFingerprint(rootNode);
     
-    // Detect PSBT type
     const psbtType = detectPsbtType(psbtBase64);
     const needsPreprocessing = psbtType === 'send';
     
-    // Derive descriptors
     const { external, internal } = deriveDescriptors(rootNode, fp, normalizedNetwork, psbtType);
     // Create BDK wallet
-    let wallet: any;
+    let wallet: BDKWallet;
     try {
-      // Cast network to BDK's Network type (they use the same string literal values)
-      wallet = bdk.Wallet.create(normalizedNetwork as any, external, internal);
+     
+      wallet = bdk!.Wallet.create(normalizedNetwork as BDKNetwork, external, internal);
     } catch (error) {
       throw new CryptoError('Failed to create BDK wallet', error as Error);
     }
@@ -449,14 +452,13 @@ export async function signPsbt(
     }
     
     // Load PSBT into BDK
-    let pstb: any;
+    let pstb: BDKPsbt;
     try {
-      pstb = bdk.Psbt.from_string(processedPsbt);
+      pstb = bdk!.Psbt.from_string(processedPsbt);
     } catch (error) {
       throw new CryptoError('Failed to parse PSBT', error as Error);
     }
     
-    // Sign PSBT
     const signOptions = options.signOptions || new bdk.SignOptions();
     try {
       wallet.sign(pstb, signOptions);
@@ -469,11 +471,9 @@ export async function signPsbt(
     
     return signedPsbt;
   } catch (error) {
-    // Re-throw SDK errors as-is
     if (error instanceof ValidationError || error instanceof CryptoError) {
       throw error;
     }
-    // Wrap unexpected errors
     throw new CryptoError('Unexpected error during PSBT signing', error as Error);
   }
 }
