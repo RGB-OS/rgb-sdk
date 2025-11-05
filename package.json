@@ -24,7 +24,7 @@
     "initWallet": "node --experimental-wasm-modules scripts/initWallet.js",
     "demo": "node scripts/demo.mjs",
     "example:basic": "node example-basic-usage.js",
-    "example:complete": "node example-flow.js"
+    "example:complete": "node --experimental-wasm-modules example-flow.mjs"
   },
   "files": [
     "dist",

@@ -106,7 +106,7 @@ export interface AssetNIA {
    * @memberof AssetNIA
    * @example rgb:2dkSTbr-jFhznbPmo-TQafzswCN-av4gTsJjX-ttx6CNou5-M98k8Zd
    */
-  assetId?: string;
+  asset_id?: string;
 
   /**
    * @type {AssetIface}
@@ -147,7 +147,7 @@ export interface AssetNIA {
    * @memberof AssetNIA
    * @example 777
    */
-  issuedSupply?: number;
+  issued_supply?: number;
 
   /**
    * @type {number}
@@ -161,7 +161,7 @@ export interface AssetNIA {
    * @memberof AssetNIA
    * @example 1691161979
    */
-  addedAt?: number;
+  added_at?: number;
 
   /**
    * @type {BtcBalance}
