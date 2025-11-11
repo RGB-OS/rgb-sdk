@@ -1,6 +1,6 @@
 {
   "name": "rgb-sdk",
-  "version": "1.0.23",
+  "version": "1.1.0",
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^22.17.2",
