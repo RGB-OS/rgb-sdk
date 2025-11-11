@@ -21,8 +21,9 @@ With this SDK, developers can:
 
 | Method | Description |
 |--------|-------------|
-| `generateKeys(network)` | Generate new wallet keypair with mnemonic/xpub/master fingerprint |
-| `deriveKeysFromMnemonic(network, mnemonic)` | Derive wallet keys from existing mnemonic |
+| `generateKeys(network)` | Generate new wallet keypair with mnemonic/xpub/xpriv/master fingerprint |
+| `deriveKeysFromMnemonic(network, mnemonic)` | Derive wallet keys (xpub/xpriv) from existing mnemonic |
+| `deriveKeysFromSeed(network, seed)` | Derive wallet keys (xpub/xpriv) directly from a BIP39 seed |
 | `registerWallet()` | Register wallet with the RGB Node |
 | `getBtcBalance()` | Get on-chain BTC balance |
 | `getAddress()` | Get a derived deposit address |
@@ -36,12 +37,16 @@ With this SDK, developers can:
 | `issueAssetNia({...})` | Issue a new Non-Inflationary Asset |
 | `signPsbt(psbt, mnemonic?)` | Sign PSBT using mnemonic and BDK (async) |
 | `refreshWallet()` | Sync and refresh wallet state |
+| `syncWallet()` | Trigger wallet sync without additional refresh logic |
 | `listTransactions()` | List BTC-level transactions |
 | `listTransfers(asset_id)` | List RGB transfer history for asset |
 | `failTransfers(...)` | Mark expired transfers as failed |
 | `sendBegin(...)` | Prepare a transfer (build unsigned PSBT) |
 | `sendEnd(...)` | Submit signed PSBT to complete transfer |
 | `send(...)` | Complete send operation: begin → sign → end |
+| `createBackup(password)` | Create an encrypted wallet backup on the RGB node |
+| `downloadBackup(backupId?)` | Download the generated backup binary |
+| `restoreFromBackup({ backup, password, ... })` | Restore wallet state from a backup file |
 
 ---
 
@@ -184,6 +189,7 @@ const { WalletManager, createWallet } = require('rgb-sdk');
 // 1. Generate wallet keys
 const keys = await createWallet('regtest');
 console.log('Master Fingerprint:', keys.master_fingerprint);
+console.log('Master XPriv:', keys.xpriv); // Store securely!
 
 // 2. Initialize wallet (constructor-based)
 const wallet = new WalletManager({
@@ -399,6 +405,7 @@ const { createWallet, deriveKeysFromMnemonic } = require('rgb-sdk');
 // Generate new wallet keys
 const keys = await createWallet('testnet');
 const mnemonic = keys.mnemonic;
+const xpriv = keys.xpriv; // Sensitive - protect at rest
 
 // Store mnemonic securely for later restoration
 // Use environment variables for production
@@ -406,6 +413,7 @@ const storedMnemonic = process.env.WALLET_MNEMONIC;
 
 // Restore keys from mnemonic
 const restoredKeys = await deriveKeysFromMnemonic('testnet', storedMnemonic);
+// Optionally, persist restoredKeys.xpriv if your flow requires explicit xpriv access
 ```
 
 ---

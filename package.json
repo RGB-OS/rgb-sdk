@@ -1,5 +1,5 @@
 {
-  "name": "rgb-connect-nodejs",
+  "name": "rgb-sdk",
   "version": "1.0.23",
   "devDependencies": {
     "@types/jest": "^30.0.0",
@@ -20,10 +20,6 @@
     "version:patch": "npm version patch && git push && git push --tags && npm publish --access public",
     "version:minor": "npm version minor && git push && git push --tags && npm publish --access public",
     "version:major": "npm version major && git push && git push --tags && npm publish --access public",
-    "example": "node scripts/signPsbt.mjs",
-    "initWallet": "node --experimental-wasm-modules scripts/initWallet.js",
-    "demo": "node scripts/demo.mjs",
-    "example:basic": "node example-basic-usage.js",
     "example:complete": "node --experimental-wasm-modules example-flow.mjs"
   },
   "files": [
