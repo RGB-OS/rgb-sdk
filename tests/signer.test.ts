@@ -1,10 +1,14 @@
 // Import from built ESM dist files
 // Using dynamic import to handle WASM modules with experimental flags
-import { signPsbt, signPsbtSync, ValidationError, CryptoError } from '../dist/index.mjs';
+import { signPsbt, signPsbtFromSeed, ValidationError, CryptoError } from '../dist/index.mjs';
+import bip39 from 'bip39';
 
 describe('signer', () => {
   // Test data from user
   const testMnemonic = 'poem twice question inch happy capital grain quality laptop dry chaos what';
+  const seedBuffer = bip39.mnemonicToSeedSync(testMnemonic);
+  const testSeedHex = Buffer.from(seedBuffer).toString('hex');
+  const testSeedArray = new Uint8Array(seedBuffer);
   
   // UTXO creation PSBT (unsigned)
   const utxoUnsignedPsbt = 'cHNidP8BAP01AQIAAAABtSecjg4J41fmQtoh4TTlQdnu6iifN5ogbVWEAXrUWhoAAAAAAP3///8G6AMAAAAAAAAiUSDzKPGEYMWF2Spr+6GDDaiByz+OjfjlV3Lfr/zYKZ2iB+gDAAAAAAAAIlEg83490lnilgZRgrHnETy+JEjou1md47ACmb0kn5rO2+joAwAAAAAAACJRIHD6gvLQXWd4BvEW0YjxA0z50cxfC3ZUhKXnKhPTS1B+6AMAAAAAAAAiUSCXxMTRByl/+IGyzvdE6V+4ac0UOeEwe1dl3zb8ceaZ5OgDAAAAAAAAIlEg3oU2/GUMIeYj4d/R1dK5ThTLhkg7JAhjPOLjNqb215YYEzEBAAAAACJRIHn8VHdi5k8OITo7LrsqYr+cQIASgZTwvtfvYoBHBxpWoXVIAAABASsALTEBAAAAACJRIM9hxZBkyMxn4vyYOosTZEYQIMqQZRSwxigi1aTQwJLrIRaUhLceLJAwJvzah8652iBUot/I4ZG5LVNrof4L451TuRkApmv/71YAAIABAACAAAAAgAEAAAAAAAAAARcglIS3HiyQMCb82ofOudogVKLfyOGRuS1Ta6H+C+OdU7kAAQUgeHCOVR20fg1Bz+fM/Cpg3KrkSlmKQDLwInucZ2bCMcwhB3hwjlUdtH4NQc/nzPwqYNyq5EpZikAy8CJ7nGdmwjHMGQCma//vVgAAgB+fDIAAAACAAAAAAAIAAAAAAQUgzBIX4uwl2L4m53HESkMyqyevlalsmf3tw9nH0r3KQoIhB8wSF+LsJdi+JudxxEpDMqsnr5WpbJn97cPZx9K9ykKCGQCma//vVgAAgB+fDIAAAACAAAAAAAMAAAAAAQUgs43Fa7pRIMJTLGHkWwyCRf16wo3uSS/3CDv0c550QBkhB7ONxWu6USDCUyxh5FsMgkX9esKN7kkv9wg79HOedEAZGQCma//vVgAAgB+fDIAAAACAAAAAAAQAAAAAAQUgaqAn3Z3FYWYqPiTb2KCMBirkLH3ZnhE1Q7NpCOiuJBkhB2qgJ92dxWFmKj4k29igjAYq5Cx92Z4RNUOzaQjoriQZGQCma//vVgAAgB+fDIAAAACAAAAAAAEAAAAAAQUgnZNdhk/w7sXuE3/fLeNHq5My6f6IqMI5KrZAVeoZdnUhB52TXYZP8O7F7hN/3y3jR6uTMun+iKjCOSq2QFXqGXZ1GQCma//vVgAAgB+fDIAAAACAAAAAAAAAAAAAAQUg+5xo2r852/jJjwIpMPXdsWsse2hpIxAhJhP6YDPcrrIhB/ucaNq/Odv4yY8CKTD13bFrLHtoaSMQISYT+mAz3K6yGQCma//vVgAAgAEAAIAAAACAAQAAAAEAAAAA';
@@ -84,15 +88,26 @@ describe('signer', () => {
     });
   });
 
-  describe('signPsbtSync', () => {
-    it('should be an alias for signPsbt', async () => {
-      const signed1 = await signPsbt(testMnemonic, utxoUnsignedPsbt, 'testnet');
-      const signed2 = await signPsbtSync(testMnemonic, utxoUnsignedPsbt, 'testnet');
-      
-      expect(signed1).toBe(signed2);
-      expect(signed2).toBe(utxoSignedPsbt);
+  describe('signPsbtFromSeed', () => {
+    it('should sign using a 64-byte hex seed string', async () => {
+      const signed = await signPsbtFromSeed(testSeedHex, utxoUnsignedPsbt, 'testnet');
+
+      expect(signed).toBeTruthy();
+      expect(signed).toBe(utxoSignedPsbt);
+    });
+
+    it('should sign using a Uint8Array seed', async () => {
+      const signed = await signPsbtFromSeed(testSeedArray, utxoUnsignedPsbt, 'testnet');
+
+      expect(signed).toBeTruthy();
+      expect(signed).toBe(utxoSignedPsbt);
+    });
+
+    it('should throw ValidationError for invalid seed string', async () => {
+      await expect(signPsbtFromSeed('1234', utxoUnsignedPsbt, 'testnet')).rejects.toThrow(ValidationError);
     });
   });
+
 
   describe('validation', () => {
     it('should throw ValidationError for empty mnemonic', async () => {

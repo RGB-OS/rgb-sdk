@@ -48,6 +48,7 @@
     "bip32": "^5.0.0-rc.0",
     "bip39": "^3.1.0",
     "bitcoinjs-lib": "^6.1.7",
+    "form-data": "^4.0.0",
     "ripemd160": "^2.0.3"
   },
   "keywords": [

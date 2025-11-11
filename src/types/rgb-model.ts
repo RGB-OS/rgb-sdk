@@ -11,6 +11,15 @@ export interface FailTransfersRequest {
   no_asset_only?: boolean
   skip_sync?: boolean
 }
+
+export interface WalletBackupResponse {
+  message: string;
+  download_url: string;
+}
+
+export interface WalletRestoreResponse {
+  message: string;
+}
 export interface WitnessData {
   amount_sat: number;
   blinding?: number;
@@ -29,6 +38,8 @@ export interface IssueAssetNiaRequestModel { ticker: string; name: string; amoun
 export interface SendAssetBeginRequestModel {
   invoice: string;
   witness_data?: WitnessData;
+  asset_id?: string;
+  amount?: number;
   // recipient_map: Record<string, Recipient[]>;
   // donation?: boolean;            // default: false
   fee_rate?: number;             // default: 1

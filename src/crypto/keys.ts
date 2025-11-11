@@ -103,6 +103,42 @@ async function ensureDependencies() {
   await dependenciesLoading;
 }
 
+type SeedInput = string | Uint8Array;
+
+function normalizeSeedInput(seed: SeedInput, field: string = 'seed'): Uint8Array {
+  if (typeof seed === 'string') {
+    const trimmed = seed.trim();
+    if (!trimmed) {
+      throw new ValidationError(`${field} must be a non-empty hex string`, field);
+    }
+    const hex = trimmed.startsWith('0x') ? trimmed.slice(2) : trimmed;
+    if (hex.length % 2 !== 0) {
+      throw new ValidationError(`${field} hex string must have even length`, field);
+    }
+    if (hex.length !== 128) {
+      throw new ValidationError(`${field} must be 64 bytes (128 hex characters)`, field);
+    }
+    if (!/^[0-9a-fA-F]+$/.test(hex)) {
+      throw new ValidationError(`${field} must be a valid hex string`, field);
+    }
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i++) {
+      const byte = hex.slice(i * 2, i * 2 + 2);
+      bytes[i] = parseInt(byte, 16);
+    }
+    return bytes;
+  }
+
+  if (seed instanceof Uint8Array) {
+    if (seed.length === 0) {
+      throw new ValidationError(`${field} must not be empty`, field);
+    }
+    return new Uint8Array(seed);
+  }
+
+  throw new ValidationError(`${field} must be a 64-byte hex string or Uint8Array`, field);
+}
+
 // Bip32 network versions (matches BIP32 Network schema: { bip32: { public, private }, wif })
 interface NetworkVersions {
   bip32: {
@@ -137,6 +173,7 @@ export interface GeneratedKeys {
   account_xpub_vanilla: string;
   account_xpub_colored: string;
   master_fingerprint: string;
+  xpriv: string;
 }
 
 export interface AccountXpubs {
@@ -269,6 +306,7 @@ async function getXpubFromXprivInternal(xpriv: string, bitcoinNetwork?: string |
 async function buildKeysOutput(mnemonic: string, bitcoinNetwork: string | number): Promise<GeneratedKeys> {
   const root = await mnemonicToRoot(mnemonic, bitcoinNetwork);
   const xpub = root.neutered().toBase58();
+  const xpriv = root.toBase58();
   const master_fingerprint = await masterFingerprintFromNode(root);
 
   const account_xpub_vanilla = await getAccountXpub(mnemonic, bitcoinNetwork, false);
@@ -279,7 +317,47 @@ async function buildKeysOutput(mnemonic: string, bitcoinNetwork: string | number
     xpub,
     account_xpub_vanilla,
     account_xpub_colored,
-    master_fingerprint
+    master_fingerprint,
+    xpriv
+  };
+}
+
+async function buildKeysOutputFromSeed(seed: Uint8Array | Buffer, bitcoinNetwork: string | number): Promise<GeneratedKeys> {
+  await ensureDependencies();
+
+  if (!BIP32FactoryInstance || !ecc) {
+    throw new CryptoError('BIP32Factory or ECC not loaded');
+  }
+
+  const seedBuffer = normalizeSeedBuffer(seed);
+  const versions = getNetworkVersions(bitcoinNetwork);
+  const bip32 = BIP32FactoryInstance(ecc);
+
+  let root: BIP32Interface;
+  try {
+    root = bip32.fromSeed(seedBuffer, versions);
+  } catch (error) {
+    throw new CryptoError('Failed to create BIP32 root node from seed', error as Error);
+  }
+
+  const xpub = root.neutered().toBase58();
+  const xpriv = root.toBase58();
+  const master_fingerprint = await masterFingerprintFromNode(root);
+
+  const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
+  const vanillaPath = accountDerivationPath(normalizedNetwork, false);
+  const coloredPath = accountDerivationPath(normalizedNetwork, true);
+
+  const account_xpub_vanilla = root.derivePath(vanillaPath).neutered().toBase58();
+  const account_xpub_colored = root.derivePath(coloredPath).neutered().toBase58();
+
+  return {
+    mnemonic: '',
+    xpub,
+    account_xpub_vanilla,
+    account_xpub_colored,
+    master_fingerprint,
+    xpriv
   };
 }
 
@@ -302,6 +380,7 @@ async function buildKeysOutputFromXpriv(xpriv: string, bitcoinNetwork: string | 
     const root = bip32.fromBase58(xpriv, versions);
     
     const xpub = root.neutered().toBase58();
+    const xprivNormalized = root.toBase58();
     const master_fingerprint = await masterFingerprintFromNode(root);
     
     const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
@@ -316,7 +395,8 @@ async function buildKeysOutputFromXpriv(xpriv: string, bitcoinNetwork: string | 
       xpub,
       account_xpub_vanilla,
       account_xpub_colored,
-      master_fingerprint
+      master_fingerprint,
+      xpriv: xprivNormalized
     };
   } catch (error) {
     throw new CryptoError('Failed to derive keys from xpriv', error as Error);
@@ -397,6 +477,26 @@ export async function deriveKeysFromMnemonic(
       throw error;
     }
     throw new CryptoError('Failed to derive keys from mnemonic', error as Error);
+  }
+}
+
+/**
+ * Derive wallet keys directly from a BIP39 seed (hex string or Uint8Array)
+ */
+export async function deriveKeysFromSeed(
+  bitcoinNetwork: string | number = 'regtest',
+  seed: string | Uint8Array
+): Promise<GeneratedKeys> {
+  const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
+
+  try {
+    const normalizedSeed = normalizeSeedInput(seed, 'seed');
+    return await buildKeysOutputFromSeed(normalizedSeed, normalizedNetwork);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    throw new CryptoError('Failed to derive keys from seed', error as Error);
   }
 }
 

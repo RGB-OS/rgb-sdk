@@ -1,8 +1,25 @@
 /**
  * RGB Client - Main client class for interacting with RGB Node API
  */
+import FormData from "form-data";
+import type { Readable } from "stream";
 import { createClient } from "./http-client";
-import { AssetBalanceResponse, BtcBalance, FailTransfersRequest, InvoiceReceiveData, InvoiceRequest, IssueAssetNIAResponse, ListAssetsResponse, RGBHTTPClientParams, RgbTransfer, SendAssetBeginRequestModel, SendAssetEndRequestModel, Unspent } from "../types/rgb-model";
+import {
+  AssetBalanceResponse,
+  BtcBalance,
+  FailTransfersRequest,
+  InvoiceReceiveData,
+  InvoiceRequest,
+  IssueAssetNIAResponse,
+  ListAssetsResponse,
+  RGBHTTPClientParams,
+  RgbTransfer,
+  SendAssetBeginRequestModel,
+  SendAssetEndRequestModel,
+  Unspent,
+  WalletBackupResponse,
+  WalletRestoreResponse
+} from "../types/rgb-model";
 
 /**
  * RGB Client class for interacting with RGB Node API
@@ -24,9 +41,15 @@ import { AssetBalanceResponse, BtcBalance, FailTransfersRequest, InvoiceReceiveD
  */
 export class RGBClient {
   private client;
+  private readonly xpubVan: string;
+  private readonly xpubCol: string;
+  private readonly masterFingerprint: string;
 
   constructor(params: RGBHTTPClientParams) {
     this.client = createClient(params);
+    this.xpubVan = params.xpub_van;
+    this.xpubCol = params.xpub_col;
+    this.masterFingerprint = params.master_fingerprint;
   }
 
   /**
@@ -138,5 +161,61 @@ export class RGBClient {
   async failTransfers(params: FailTransfersRequest): Promise<boolean> {
     const { batch_transfer_idx, no_asset_only = false, skip_sync = false } = params;
     return this.request<boolean>("post", "/wallet/failtransfers", { batch_transfer_idx, no_asset_only, skip_sync });
+  }
+
+  async syncWallet(): Promise<void> {
+    await this.request<void>("post", "/wallet/sync");
+  }
+
+  async createBackup(params: { password: string }): Promise<WalletBackupResponse> {
+    return this.request<WalletBackupResponse>("post", "/wallet/backup", params);
+  }
+
+  async downloadBackup(backupId: string = this.xpubVan): Promise<ArrayBuffer | Buffer> {
+    const response = await this.client.get(`/wallet/backup/${backupId}`, {
+      responseType: "arraybuffer"
+    });
+    const data = response.data;
+    if (typeof Buffer !== "undefined" && data instanceof ArrayBuffer) {
+      return Buffer.from(data);
+    }
+    return data;
+  }
+
+  async restoreWallet(params: {
+    file: Buffer | Uint8Array | ArrayBuffer | Readable;
+    password: string;
+    xpub_van?: string;
+    xpub_col?: string;
+    master_fingerprint?: string;
+    filename?: string;
+  }): Promise<WalletRestoreResponse> {
+    const {
+      file,
+      password,
+      filename = "wallet.backup",
+      xpub_van = this.xpubVan,
+      xpub_col = this.xpubCol,
+      master_fingerprint = this.masterFingerprint
+    } = params;
+
+    const form = new FormData();
+    const filePart =
+      file instanceof ArrayBuffer
+        ? Buffer.from(file)
+        : file instanceof Uint8Array
+          ? Buffer.from(file)
+          : file;
+
+    form.append("file", filePart, filename);
+    form.append("password", password);
+    form.append("xpub_van", xpub_van);
+    form.append("xpub_col", xpub_col);
+    form.append("master_fingerprint", master_fingerprint);
+
+    const response = await this.client.post<WalletRestoreResponse>("/wallet/restore", form, {
+      headers: form.getHeaders()
+    });
+    return response.data;
   }
 }

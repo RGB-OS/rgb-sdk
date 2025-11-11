@@ -3,6 +3,7 @@
 import { 
   generateKeys, 
   deriveKeysFromMnemonic, 
+  deriveKeysFromSeed,
   restoreKeys,
   getXprivFromMnemonic,
   getXpubFromXpriv,
@@ -10,6 +11,7 @@ import {
   ValidationError, 
   CryptoError 
 } from '../dist/index.mjs';
+import bip39 from 'bip39';
 
 describe('keys', () => {
   // Test data from user
@@ -31,6 +33,7 @@ describe('keys', () => {
       expect(keys).toHaveProperty('account_xpub_vanilla');
       expect(keys).toHaveProperty('account_xpub_colored');
       expect(keys).toHaveProperty('master_fingerprint');
+      expect(keys).toHaveProperty('xpriv');
       
       // Validate mnemonic format
       expect(keys.mnemonic).toBeTruthy();
@@ -43,6 +46,7 @@ describe('keys', () => {
       
       // Validate master fingerprint format (8 hex chars)
       expect(keys.master_fingerprint).toMatch(/^[0-9a-f]{8}$/i);
+      expect(keys.xpriv).toMatch(/^tprv/);
     });
 
     it('should generate valid keys for mainnet', async () => {
@@ -52,6 +56,7 @@ describe('keys', () => {
       expect(keys.account_xpub_vanilla).toMatch(/^xpub/);
       expect(keys.account_xpub_colored).toMatch(/^xpub/);
       expect(keys.master_fingerprint).toMatch(/^[0-9a-f]{8}$/i);
+      expect(keys.xpriv).toMatch(/^xprv/);
     });
 
     it('should generate valid keys for regtest', async () => {
@@ -61,6 +66,7 @@ describe('keys', () => {
       expect(keys.account_xpub_vanilla).toMatch(/^tpub/);
       expect(keys.account_xpub_colored).toMatch(/^tpub/);
       expect(keys.master_fingerprint).toMatch(/^[0-9a-f]{8}$/i);
+      expect(keys.xpriv).toMatch(/^tprv/);
     });
 
     it('should generate different keys on each call', async () => {
@@ -69,6 +75,7 @@ describe('keys', () => {
       
       expect(keys1.mnemonic).not.toBe(keys2.mnemonic);
       expect(keys1.xpub).not.toBe(keys2.xpub);
+      expect(keys1.xpriv).not.toBe(keys2.xpriv);
     });
 
     it('should accept network as number', async () => {
@@ -83,21 +90,25 @@ describe('keys', () => {
   describe('deriveKeysFromMnemonic', () => {
     it('should derive correct keys from testnet mnemonic', async () => {
       const keys = await deriveKeysFromMnemonic('testnet', testMnemonic);
+      const expectedXpriv = await getXprivFromMnemonic('testnet', testMnemonic);
       
       expect(keys.mnemonic).toBe(testMnemonic);
       expect(keys.xpub).toBe(expectedKeys.xpub);
       expect(keys.account_xpub_vanilla).toBe(expectedKeys.account_xpub_vanilla);
       expect(keys.account_xpub_colored).toBe(expectedKeys.account_xpub_colored);
       expect(keys.master_fingerprint.toLowerCase()).toBe(expectedKeys.master_fingerprint.toLowerCase());
+      expect(keys.xpriv).toBe(expectedXpriv);
     });
 
     it('should derive keys correctly with trimmed mnemonic', async () => {
       const trimmedMnemonic = `  ${testMnemonic}  `;
       // The function should handle trimming internally
       const keys = await deriveKeysFromMnemonic('testnet', trimmedMnemonic.trim());
+      const expectedXpriv = await getXprivFromMnemonic('testnet', testMnemonic);
       
       expect(keys.account_xpub_vanilla).toBe(expectedKeys.account_xpub_vanilla);
       expect(keys.master_fingerprint.toLowerCase()).toBe(expectedKeys.master_fingerprint.toLowerCase());
+      expect(keys.xpriv).toBe(expectedXpriv);
     });
 
     it('should throw ValidationError for empty mnemonic', async () => {
@@ -142,6 +153,50 @@ describe('keys', () => {
       expect(keys1.account_xpub_vanilla).toBe(keys2.account_xpub_vanilla);
       expect(keys1.account_xpub_colored).toBe(keys2.account_xpub_colored);
       expect(keys1.master_fingerprint).toBe(keys2.master_fingerprint);
+    });
+  });
+
+  describe('deriveKeysFromSeed', () => {
+    const seedBuffer = bip39.mnemonicToSeedSync(testMnemonic);
+    const seedHex = Buffer.from(seedBuffer).toString('hex');
+    const seedArray = new Uint8Array(seedBuffer);
+    let expectedXpriv: string;
+
+    beforeAll(async () => {
+      expectedXpriv = await getXprivFromMnemonic('testnet', testMnemonic);
+    });
+
+    it('should derive correct keys from hex seed', async () => {
+      const keys = await deriveKeysFromSeed('testnet', seedHex);
+
+      expect(keys.mnemonic).toBe('');
+      expect(keys.xpub).toBe(expectedKeys.xpub);
+      expect(keys.account_xpub_vanilla).toBe(expectedKeys.account_xpub_vanilla);
+      expect(keys.account_xpub_colored).toBe(expectedKeys.account_xpub_colored);
+      expect(keys.master_fingerprint.toLowerCase()).toBe(expectedKeys.master_fingerprint.toLowerCase());
+      expect(keys.xpriv).toBe(expectedXpriv);
+    });
+
+    it('should derive correct keys from Uint8Array seed', async () => {
+      const keys = await deriveKeysFromSeed('testnet', seedArray);
+
+      expect(keys.mnemonic).toBe('');
+      expect(keys.xpub).toBe(expectedKeys.xpub);
+      expect(keys.account_xpub_vanilla).toBe(expectedKeys.account_xpub_vanilla);
+      expect(keys.account_xpub_colored).toBe(expectedKeys.account_xpub_colored);
+      expect(keys.master_fingerprint.toLowerCase()).toBe(expectedKeys.master_fingerprint.toLowerCase());
+      expect(keys.xpriv).toBe(expectedXpriv);
+    });
+
+    it('should accept network as number', async () => {
+      const keys = await deriveKeysFromSeed(2, seedHex);
+
+      expect(keys.account_xpub_vanilla).toMatch(/^tpub/);
+      expect(keys.account_xpub_colored).toMatch(/^tpub/);
+    });
+
+    it('should throw ValidationError for invalid seed string', async () => {
+      await expect(deriveKeysFromSeed('testnet', '1234')).rejects.toThrow(ValidationError);
     });
   });
 
@@ -254,7 +309,6 @@ describe('keys', () => {
       expect(keys.account_xpub_vanilla).toBe(expectedKeys.account_xpub_vanilla);
       expect(keys.account_xpub_colored).toBe(expectedKeys.account_xpub_colored);
       expect(keys.master_fingerprint.toLowerCase()).toBe(expectedKeys.master_fingerprint.toLowerCase());
-      console.log(keys);
       // Mnemonic should be empty when derived from xpriv
       expect(keys.mnemonic).toBe('');
     });

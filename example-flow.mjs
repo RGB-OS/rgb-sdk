@@ -1,9 +1,15 @@
 import axios from 'axios';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { WalletManager, createWallet } from './dist/index.mjs';
 
 // Configuration
 const RGB_MANAGER_ENDPOINT = "http://127.0.0.1:8000";
 const BITCOIN_NODE_ENDPOINT = "http://18.119.98.232:5000/execute";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Mine blocks using the Bitcoin node endpoint
@@ -266,8 +272,26 @@ async function main() {
         await senderWallet.refreshWallet();
         await receiverWallet.refreshWallet();
 
-        // Note: Backup/restore functionality would need to be implemented
-        // if the RGB Node API supports it
+        console.log("\nCreating wallet backup...");
+        const backupPassword = "test-backup-password";
+        const backupInfo = await senderWallet.createBackup(backupPassword);
+        console.log("Backup info:", backupInfo);
+
+        console.log("Downloading backup file...");
+        const backupBinary = await senderWallet.downloadBackup();
+        const backupBuffer = backupBinary instanceof ArrayBuffer ? Buffer.from(backupBinary) : backupBinary;
+        const backupFileName = `${senderKeys.account_xpub_vanilla}.backup`;
+        const backupFilePath = path.join(__dirname, backupFileName);
+        await fs.writeFile(backupFilePath, backupBuffer);
+        console.log(`Backup saved to ${backupFilePath}`);
+
+        console.log("\nRestoring wallet from backup...");
+        const restoreResult = await senderWallet.restoreFromBackup({
+            backup: backupBuffer,
+            password: backupPassword,
+            filename: backupFileName
+        });
+        console.log("Restore result:", restoreResult);
 
         console.log("\nExample completed successfully!");
         console.log("=".repeat(50));

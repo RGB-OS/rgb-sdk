@@ -1,23 +1,26 @@
 import { RGBClient } from '../client/index';
-import { 
-  FailTransfersRequest, 
-  InvoiceRequest, 
+import {
+  FailTransfersRequest,
+  InvoiceRequest,
   InvoiceReceiveData,
-  IssueAssetNiaRequestModel, 
+  IssueAssetNiaRequestModel,
   IssueAssetNIAResponse,
-  SendAssetBeginRequestModel, 
+  SendAssetBeginRequestModel,
   SendAssetEndRequestModel,
   AssetBalanceResponse,
   BtcBalance,
   ListAssetsResponse,
   Unspent,
-  RgbTransfer
+  RgbTransfer,
+  WalletBackupResponse,
+  WalletRestoreResponse
 } from '../types/rgb-model';
-import { signPsbt } from '../crypto';
+import { signPsbt, signPsbtFromSeed } from '../crypto';
 import type { Network } from '../crypto';
 import { generateKeys } from '../crypto';
 import { normalizeNetwork } from '../utils/validation';
 import { ValidationError, WalletError } from '../errors';
+import type { Readable } from 'stream';
 
 /**
  * Generate a new wallet with keys
@@ -33,6 +36,7 @@ export type WalletInitParams = {
   xpub_col: string;
   rgb_node_endpoint: string;
   mnemonic?: string;
+  seed?: Uint8Array;
   network?: string | number;
   master_fingerprint: string;
 }
@@ -65,6 +69,7 @@ export class WalletManager {
   private readonly xpub_van: string;
   private readonly xpub_col: string;
   private readonly mnemonic: string | null;
+  private readonly seed: Uint8Array | null;
   private readonly network: Network;
   private readonly masterFingerprint: string;
 
@@ -94,9 +99,10 @@ export class WalletManager {
     // Store wallet state
     this.xpub_van = params.xpub_van;
     this.xpub_col = params.xpub_col;
+    this.seed = params.seed ?? null;
     this.mnemonic = params.mnemonic ?? null;
     this.masterFingerprint = params.master_fingerprint;
-    
+
     // Normalize network using utility function
     this.network = normalizeNetwork(params.network ?? 'regtest');
   }
@@ -105,9 +111,9 @@ export class WalletManager {
    * Get wallet's extended public keys
    */
   public getXpub(): { xpub_van: string; xpub_col: string } {
-    return { 
-      xpub_van: this.xpub_van, 
-      xpub_col: this.xpub_col 
+    return {
+      xpub_van: this.xpub_van,
+      xpub_col: this.xpub_col
     };
   }
 
@@ -192,31 +198,89 @@ export class WalletManager {
     return this.client.decodeRGBInvoice(params);
   }
 
-      /**
-       * Sign a PSBT using the wallet's mnemonic or a provided mnemonic
-       * @param psbt - Base64 encoded PSBT
-       * @param mnemonic - Optional mnemonic (uses wallet's mnemonic if not provided)
-       */
-      public async signPsbt(psbt: string, mnemonic?: string): Promise<string> {
-        const mnemonicToUse = mnemonic ?? this.mnemonic;
-        
-        if (!mnemonicToUse) {
-          throw new WalletError('mnemonic is required. Provide it as parameter or initialize wallet with mnemonic.');
-        }
+  public async createBackup(password: string): Promise<WalletBackupResponse> {
+    if (!password) {
+      throw new ValidationError('password is required', 'password');
+    }
+    return this.client.createBackup({ password });
+  }
 
-        return await signPsbt(mnemonicToUse, psbt, this.network);
-      }
+  public async downloadBackup(backupId?: string): Promise<ArrayBuffer | Buffer> {
+    return this.client.downloadBackup(backupId ?? this.xpub_van);
+  }
 
-      /**
-       * Complete send operation: begin → sign → end
-       * @param invoiceTransfer - Transfer invoice parameters
-       * @param mnemonic - Optional mnemonic for signing
-       */
-      public async send(invoiceTransfer: SendAssetBeginRequestModel, mnemonic?: string): Promise<string> {
-        const psbt = await this.sendBegin(invoiceTransfer);
-        const signed_psbt = await this.signPsbt(psbt, mnemonic);
-        return await this.sendEnd({ signed_psbt });
-      }
+  public async restoreFromBackup(params: {
+    backup: Buffer | Uint8Array | ArrayBuffer | Readable;
+    password: string;
+    filename?: string;
+    xpub_van?: string;
+    xpub_col?: string;
+    master_fingerprint?: string;
+  }): Promise<WalletRestoreResponse> {
+    const {
+      backup,
+      password,
+      filename,
+      xpub_van = this.xpub_van,
+      xpub_col = this.xpub_col,
+      master_fingerprint = this.masterFingerprint
+    } = params;
+
+    if (!backup) {
+      throw new ValidationError('backup file is required', 'backup');
+    }
+    if (!password) {
+      throw new ValidationError('password is required', 'password');
+    }
+
+    return this.client.restoreWallet({
+      file: backup,
+      password,
+      filename,
+      xpub_van,
+      xpub_col,
+      master_fingerprint
+    });
+  }
+
+  /**
+   * Sign a PSBT using the wallet's mnemonic or a provided mnemonic
+   * @param psbt - Base64 encoded PSBT
+   * @param mnemonic - Optional mnemonic (uses wallet's mnemonic if not provided)
+   */
+  public async signPsbt(psbt: string, mnemonic?: string): Promise<string> {
+    const mnemonicToUse = mnemonic ?? this.mnemonic;
+
+    if (mnemonicToUse) {
+      return await signPsbt(mnemonicToUse, psbt, this.network);
+    }
+    if (this.seed) {
+      return await signPsbtFromSeed(this.seed, psbt, this.network);
+    }
+
+    throw new WalletError('mnemonic is required. Provide it as parameter or initialize wallet with mnemonic.');
+  }
+
+  /**
+   * Complete send operation: begin → sign → end
+   * @param invoiceTransfer - Transfer invoice parameters
+   * @param mnemonic - Optional mnemonic for signing
+   */
+  public async send(invoiceTransfer: SendAssetBeginRequestModel, mnemonic?: string): Promise<string> {
+    const psbt = await this.sendBegin(invoiceTransfer);
+    const signed_psbt = await this.signPsbt(psbt, mnemonic);
+    return await this.sendEnd({ signed_psbt });
+  }
+
+  public async createUtxos({ up_to, num, size, fee_rate }: { up_to?: boolean, num?: number, size?: number, fee_rate?: number }): Promise<number> {
+    const psbt = await this.createUtxosBegin({ up_to, num, size, fee_rate });
+    const signed_psbt = await this.signPsbt(psbt);
+    return await this.createUtxosEnd({ signed_psbt });
+  }
+
+  public async syncWallet(): Promise<void> {
+    return this.client.syncWallet();
+  }
 }
 
 /**

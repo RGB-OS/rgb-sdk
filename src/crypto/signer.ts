@@ -56,6 +56,34 @@ let toXOnly: ((pubkey: Buffer) => Buffer) | undefined;
 let bdk: BDKModule | undefined;
 let init: BDKInit | undefined;
 
+function normalizeSeedInput(seed: string | Uint8Array, field: string = 'seed'): Uint8Array {
+  if (typeof seed === 'string') {
+    const trimmed = seed.trim();
+    if (!trimmed) {
+      throw new ValidationError(`${field} must be a non-empty hex string`, field);
+    }
+    const hex = trimmed.startsWith('0x') ? trimmed.slice(2) : trimmed;
+    if (hex.length !== 128 || !/^[0-9a-fA-F]+$/.test(hex)) {
+      throw new ValidationError(`${field} must be a 64-byte hex string`, field);
+    }
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i++) {
+      const byte = hex.slice(i * 2, i * 2 + 2);
+      bytes[i] = parseInt(byte, 16);
+    }
+    return bytes;
+  }
+
+  if (seed instanceof Uint8Array) {
+    if (seed.length === 0) {
+      throw new ValidationError(`${field} must not be empty`, field);
+    }
+    return seed;
+  }
+
+  throw new ValidationError(`${field} must be a 64-byte hex string or Uint8Array`, field);
+}
+
 // Load dependencies based on environment
 async function loadDependencies(): Promise<void> {
   if (isNode()) {
@@ -364,6 +392,69 @@ async function getMasterFingerprint(rootNode: BIP32Interface): Promise<string> {
   return calculateMasterFingerprint(rootNode);
 }
 
+async function signPsbtFromSeedInternal(
+  seed: Buffer | Uint8Array,
+  psbtBase64: string,
+  network: Network,
+  options: SignPsbtOptions = {}
+): Promise<string> {
+  await ensureDependencies();
+
+  validatePsbt(psbtBase64, 'psbtBase64');
+
+  if (!ecc || !BIP32FactoryInstance || !bdk) {
+    throw new CryptoError('Dependencies not loaded');
+  }
+
+  const bip32 = BIP32FactoryInstance(ecc);
+  const seedBuffer = normalizeSeedBuffer(seed);
+  const versions = getNetworkVersions(network);
+
+  let rootNode: BIP32Interface;
+  try {
+    rootNode = bip32.fromSeed(seedBuffer, versions);
+  } catch (error) {
+    throw new CryptoError('Failed to derive root node from seed', error as Error);
+  }
+
+  const fp = await getMasterFingerprint(rootNode);
+  const psbtType = detectPsbtType(psbtBase64);
+  const needsPreprocessing = psbtType === 'send';
+  const { external, internal } = deriveDescriptors(rootNode, fp, network, psbtType);
+
+  let wallet: BDKWallet;
+  try {
+    wallet = bdk!.Wallet.create(network as BDKNetwork, external, internal);
+  } catch (error) {
+    throw new CryptoError('Failed to create BDK wallet', error as Error);
+  }
+
+  let processedPsbt = psbtBase64.trim();
+  if (needsPreprocessing || options.preprocess) {
+    try {
+      processedPsbt = preprocessPsbtForBDK(psbtBase64, rootNode, fp, network);
+    } catch (error) {
+      throw new CryptoError('Failed to preprocess PSBT', error as Error);
+    }
+  }
+
+  let pstb: BDKPsbt;
+  try {
+    pstb = bdk!.Psbt.from_string(processedPsbt);
+  } catch (error) {
+    throw new CryptoError('Failed to parse PSBT', error as Error);
+  }
+
+  const signOptions = options.signOptions || new bdk.SignOptions();
+  try {
+    wallet.sign(pstb, signOptions);
+  } catch (error) {
+    throw new CryptoError('Failed to sign PSBT', error as Error);
+  }
+
+  return pstb.toString().trim();
+}
+
 /**
  * Sign a PSBT using BDK
  * 
@@ -395,81 +486,23 @@ export async function signPsbt(
   options: SignPsbtOptions = {}
 ): Promise<string> {
   try {
-    // Ensure dependencies are loaded
     await ensureDependencies();
     
     // Validate inputs
     validateMnemonic(mnemonic, 'mnemonic');
-    validatePsbt(psbtBase64, 'psbtBase64');
-    const normalizedNetwork = normalizeNetwork(network);
-    
-    // Ensure modules are loaded
-    if (!bip39 || !ecc || !BIP32FactoryInstance || !bdk) {
-      throw new CryptoError('Dependencies not loaded');
+    if (!bip39 || typeof bip39.mnemonicToSeedSync !== 'function') {
+      throw new CryptoError('bip39 module not loaded correctly');
     }
-    
-    // Derive root node and master fingerprint
-    const bip32 = BIP32FactoryInstance(ecc);
+
     let seed: Buffer;
     try {
-      seed = bip39!.mnemonicToSeedSync(mnemonic);
+      seed = bip39.mnemonicToSeedSync(mnemonic);
     } catch (error) {
       throw new ValidationError('Invalid mnemonic format', 'mnemonic');
     }
-    
-    const seedBuffer = normalizeSeedBuffer(seed);
-    const versions = getNetworkVersions(normalizedNetwork);
-    let rootNode: BIP32Interface;
-    try {
-      rootNode = bip32.fromSeed(seedBuffer, versions);
-    } catch (error) {
-      throw new CryptoError('Failed to derive root node from seed', error as Error);
-    }
-    
-    const fp = await getMasterFingerprint(rootNode);
-    
-    const psbtType = detectPsbtType(psbtBase64);
-    const needsPreprocessing = psbtType === 'send';
-    
-    const { external, internal } = deriveDescriptors(rootNode, fp, normalizedNetwork, psbtType);
-    // Create BDK wallet
-    let wallet: BDKWallet;
-    try {
-     
-      wallet = bdk!.Wallet.create(normalizedNetwork as BDKNetwork, external, internal);
-    } catch (error) {
-      throw new CryptoError('Failed to create BDK wallet', error as Error);
-    }
-    
-    // Preprocess PSBT if needed
-    let processedPsbt = psbtBase64.trim();
-    if (needsPreprocessing || options.preprocess) {
-      try {
-        processedPsbt = preprocessPsbtForBDK(psbtBase64, rootNode, fp, normalizedNetwork);
-      } catch (error) {
-        throw new CryptoError('Failed to preprocess PSBT', error as Error);
-      }
-    }
-    
-    // Load PSBT into BDK
-    let pstb: BDKPsbt;
-    try {
-      pstb = bdk!.Psbt.from_string(processedPsbt);
-    } catch (error) {
-      throw new CryptoError('Failed to parse PSBT', error as Error);
-    }
-    
-    const signOptions = options.signOptions || new bdk.SignOptions();
-    try {
-      wallet.sign(pstb, signOptions);
-    } catch (error) {
-      throw new CryptoError('Failed to sign PSBT', error as Error);
-    }
-    
-    // Return signed PSBT
-    const signedPsbt = pstb.toString().trim();
-    
-    return signedPsbt;
+
+    const normalizedNetwork = normalizeNetwork(network);
+    return await signPsbtFromSeedInternal(seed, psbtBase64, normalizedNetwork, options);
   } catch (error) {
     if (error instanceof ValidationError || error instanceof CryptoError) {
       throw error;
@@ -479,10 +512,7 @@ export async function signPsbt(
 }
 
 /**
- * Synchronous version of signPsbt (alias for signPsbt)
- * Kept for backward compatibility - signPsbt is already synchronous
- * 
- * @deprecated Use signPsbt() directly - it's already synchronous
+ * Legacy sync-named wrapper (still async under the hood).
  */
 export async function signPsbtSync(
   mnemonic: string,
@@ -491,5 +521,19 @@ export async function signPsbtSync(
   options: SignPsbtOptions = {}
 ): Promise<string> {
   return signPsbt(mnemonic, psbtBase64, network, options);
+}
+
+/**
+ * Sign a PSBT using a raw BIP39 seed (hex string or Uint8Array)
+ */
+export async function signPsbtFromSeed(
+  seed: string | Uint8Array,
+  psbtBase64: string,
+  network: Network = 'testnet',
+  options: SignPsbtOptions = {}
+): Promise<string> {
+  const normalizedSeed = normalizeSeedInput(seed);
+  const normalizedNetwork = normalizeNetwork(network);
+  return signPsbtFromSeedInternal(normalizedSeed, psbtBase64, normalizedNetwork, options);
 }
 

@@ -9,13 +9,14 @@
  */
 
 // Export signer functions
-export { signPsbt, signPsbtSync } from './signer';
+export { signPsbt, signPsbtSync, signPsbtFromSeed } from './signer';
 export type { SignPsbtOptions } from './signer';
 
 // Export key functions
 export { 
   generateKeys, 
   deriveKeysFromMnemonic, 
+  deriveKeysFromSeed,
   restoreKeys, 
   accountXpubsFromMnemonic,
   getXprivFromMnemonic,
