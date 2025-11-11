@@ -1,10 +1,16 @@
 import { defineConfig } from 'tsup';
-import { copyFileSync } from 'fs';
+
 export default defineConfig({
   entry: ['src/index.ts'],
-  format: ['cjs'],
+  format: ['cjs', 'esm'],
   outDir: 'dist',
   target: 'node18',
   dts: true,
-  outExtension: () => ({ js: '.cjs' }),
+  sourcemap: true,
+  clean: true,
+  splitting: false,
+  treeshake: true,
+  outExtension: ({ format }) => ({
+    js: format === 'cjs' ? '.cjs' : '.mjs'
+  }),
 });

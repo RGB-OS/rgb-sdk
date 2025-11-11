@@ -1,15 +1,24 @@
 
-export type RGBHTTPClientParams ={ 
-  xpub_van: string,
-  xpub_col: string, 
-  master_fingerprint:string,
-  rgbEndpoint: string, 
+export type RGBHTTPClientParams = {
+  xpub_van: string;
+  xpub_col: string;
+  master_fingerprint: string;
+  rgbEndpoint: string;
 }
 
 export interface FailTransfersRequest {
   batch_transfer_idx: number
   no_asset_only?: boolean
   skip_sync?: boolean
+}
+
+export interface WalletBackupResponse {
+  message: string;
+  download_url: string;
+}
+
+export interface WalletRestoreResponse {
+  message: string;
 }
 export interface WitnessData {
   amount_sat: number;
@@ -29,6 +38,8 @@ export interface IssueAssetNiaRequestModel { ticker: string; name: string; amoun
 export interface SendAssetBeginRequestModel {
   invoice: string;
   witness_data?: WitnessData;
+  asset_id?: string;
+  amount?: number;
   // recipient_map: Record<string, Recipient[]>;
   // donation?: boolean;            // default: false
   fee_rate?: number;             // default: 1
@@ -93,7 +104,7 @@ export interface BtcBalance {
   vanilla: Balance,
   colored: Balance
 }
-export interface InvoiceReciveData {
+export interface InvoiceReceiveData {
   invoice: string
   recipient_id: string
   expiration_timestamp: number
@@ -106,7 +117,7 @@ export interface AssetNIA {
    * @memberof AssetNIA
    * @example rgb:2dkSTbr-jFhznbPmo-TQafzswCN-av4gTsJjX-ttx6CNou5-M98k8Zd
    */
-  assetId?: string;
+  asset_id?: string;
 
   /**
    * @type {AssetIface}
@@ -147,7 +158,7 @@ export interface AssetNIA {
    * @memberof AssetNIA
    * @example 777
    */
-  issuedSupply?: number;
+  issued_supply?: number;
 
   /**
    * @type {number}
@@ -161,7 +172,7 @@ export interface AssetNIA {
    * @memberof AssetNIA
    * @example 1691161979
    */
-  addedAt?: number;
+  added_at?: number;
 
   /**
    * @type {BtcBalance}
