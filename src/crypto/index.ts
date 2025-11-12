@@ -9,8 +9,8 @@
  */
 
 // Export signer functions
-export { signPsbt, signPsbtSync, signPsbtFromSeed } from './signer';
-export type { SignPsbtOptions } from './signer';
+export { signPsbt, signPsbtSync, signPsbtFromSeed, signMessage, verifyMessage } from './signer';
+export type { SignPsbtOptions, SignMessageParams, SignMessageResult, VerifyMessageParams } from './signer';
 
 // Export key functions
 export { 

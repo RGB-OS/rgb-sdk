@@ -16,7 +16,6 @@ With this SDK, developers can:
 
 ---
 
-
 ## ⚙️ Capabilities of `rgb-sdk` (via `WalletManager`)
 
 | Method | Description |
@@ -36,6 +35,8 @@ With this SDK, developers can:
 | `witnessReceive({ asset_id, amount })` | Generate witness UTXO for receiving |
 | `issueAssetNia({...})` | Issue a new Non-Inflationary Asset |
 | `signPsbt(psbt, mnemonic?)` | Sign PSBT using mnemonic and BDK (async) |
+| `signMessage(message, options?)` | Produce a Schnorr signature for an arbitrary message |
+| `verifyMessage(message, signature, options?)` | Verify Schnorr message signatures using wallet keys or provided public key |
 | `refreshWallet()` | Sync and refresh wallet state |
 | `syncWallet()` | Trigger wallet sync without additional refresh logic |
 | `listTransactions()` | List BTC-level transactions |
@@ -395,7 +396,7 @@ async function demo() {
 
 ---
 
-##  Security
+## Security
 
 ### Key Management
 
@@ -414,6 +415,20 @@ const storedMnemonic = process.env.WALLET_MNEMONIC;
 // Restore keys from mnemonic
 const restoredKeys = await deriveKeysFromMnemonic('testnet', storedMnemonic);
 // Optionally, persist restoredKeys.xpriv if your flow requires explicit xpriv access
+
+// Sign and verify arbitrary messages (Schnorr signatures)
+const seedHex = process.env.WALLET_SEED_HEX; // 64-byte hex string
+const { signature, accountXpub } = await signMessage({
+  message: 'Hello RGB!',
+  seed: seedHex,
+  network: 'testnet',
+});
+const isValid = await verifyMessage({
+  message: 'Hello RGB!',
+  signature,
+  accountXpub,
+  network: 'testnet',
+});
 ```
 
 ---
@@ -421,5 +436,6 @@ const restoredKeys = await deriveKeysFromMnemonic('testnet', storedMnemonic);
 ## Full Examples
 
 For complete working examples demonstrating all features, see:
+
 - `example-flow.js` - Complete RGB wallet workflow with two wallets, asset issuance, and transfers
 - `example-basic-usage.js` - Basic wallet operations and asset management

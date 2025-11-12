@@ -1,15 +1,28 @@
 // Import from built ESM dist files
 // Using dynamic import to handle WASM modules with experimental flags
-import { signPsbt, signPsbtFromSeed, ValidationError, CryptoError } from '../dist/index.mjs';
+import { signPsbt, signPsbtFromSeed, signMessage, verifyMessage, ValidationError, CryptoError } from '../dist/index.mjs';
 import bip39 from 'bip39';
+const expectedKeys = {
+  xpub: 'tpubD6NzVbkrYhZ4XCaTDersU6277zvyyV6uCCeEgx1jfv7bUYMrbTt8Vem1MBt5Gmp7eMwjv4rB54s2kjqNNtTLYpwFsVX7H2H93pJ8SpZFRRi',
+  account_xpub_vanilla: 'tpubDDMTD6EJKKLP6Gx9JUnMpjf9NYyePJszmqBnNqULNmcgEuU1yQ3JsHhWZdRFecszWETnNsmhEe9vnaNibfzZkDDHycbR2rGFbXdHWRgBfu7',
+  account_xpub_colored: 'tpubDDPLJfdVbDoGtnn6hSto3oCnm6hpfHe9uk2MxcANanxk87EuquhSVfSLQv7e5UykgzaFn41DUXaikjjVGcUSUTGNaJ9LcozfRwatKp1vTfC',
+  master_fingerprint: 'a66bffef',
+};
 
+const testKeysv2={
+  "mnemonic": "vivid local super hockey boy model vintage ancient art organ cry demise",
+  "xpub": "tpubD6NzVbkrYhZ4YBBMLRg9m7MJRXFREpzKAzeEFAH5Nkz3EyoJEZMVk9XEMqgUAwtSszXVQPZAAf68T9x7c6Z1jEg8hhrGR39xCyNHwUiMgUP",
+  "account_xpub_vanilla": "tpubDDFXNYFNPDFmGGATzpUcdBXjbCdBZdFmB5AsPCbWQWH7PWiZLWNXD5wGSuu4QJSFMSBUQHWe6PSZr71eVgtDTbUHhEPm14B3JeVya2Ywd5L",
+  "account_xpub_colored": "tpubDDt55tE7JJ56G8EnuB7qymh6oims7aJAYfmE6QQ1URDhAzPRi7aNoNr9rbHRLQ8WFPCyEKmdd1fTEkDHYvkFViZ7kseruuXv5FWvVFsnRcP",
+  "master_fingerprint": "77f3f0ce"
+}
 describe('signer', () => {
   // Test data from user
   const testMnemonic = 'poem twice question inch happy capital grain quality laptop dry chaos what';
   const seedBuffer = bip39.mnemonicToSeedSync(testMnemonic);
   const testSeedHex = Buffer.from(seedBuffer).toString('hex');
   const testSeedArray = new Uint8Array(seedBuffer);
-  
+ 
   // UTXO creation PSBT (unsigned)
   const utxoUnsignedPsbt = 'cHNidP8BAP01AQIAAAABtSecjg4J41fmQtoh4TTlQdnu6iifN5ogbVWEAXrUWhoAAAAAAP3///8G6AMAAAAAAAAiUSDzKPGEYMWF2Spr+6GDDaiByz+OjfjlV3Lfr/zYKZ2iB+gDAAAAAAAAIlEg83490lnilgZRgrHnETy+JEjou1md47ACmb0kn5rO2+joAwAAAAAAACJRIHD6gvLQXWd4BvEW0YjxA0z50cxfC3ZUhKXnKhPTS1B+6AMAAAAAAAAiUSCXxMTRByl/+IGyzvdE6V+4ac0UOeEwe1dl3zb8ceaZ5OgDAAAAAAAAIlEg3oU2/GUMIeYj4d/R1dK5ThTLhkg7JAhjPOLjNqb215YYEzEBAAAAACJRIHn8VHdi5k8OITo7LrsqYr+cQIASgZTwvtfvYoBHBxpWoXVIAAABASsALTEBAAAAACJRIM9hxZBkyMxn4vyYOosTZEYQIMqQZRSwxigi1aTQwJLrIRaUhLceLJAwJvzah8652iBUot/I4ZG5LVNrof4L451TuRkApmv/71YAAIABAACAAAAAgAEAAAAAAAAAARcglIS3HiyQMCb82ofOudogVKLfyOGRuS1Ta6H+C+OdU7kAAQUgeHCOVR20fg1Bz+fM/Cpg3KrkSlmKQDLwInucZ2bCMcwhB3hwjlUdtH4NQc/nzPwqYNyq5EpZikAy8CJ7nGdmwjHMGQCma//vVgAAgB+fDIAAAACAAAAAAAIAAAAAAQUgzBIX4uwl2L4m53HESkMyqyevlalsmf3tw9nH0r3KQoIhB8wSF+LsJdi+JudxxEpDMqsnr5WpbJn97cPZx9K9ykKCGQCma//vVgAAgB+fDIAAAACAAAAAAAMAAAAAAQUgs43Fa7pRIMJTLGHkWwyCRf16wo3uSS/3CDv0c550QBkhB7ONxWu6USDCUyxh5FsMgkX9esKN7kkv9wg79HOedEAZGQCma//vVgAAgB+fDIAAAACAAAAAAAQAAAAAAQUgaqAn3Z3FYWYqPiTb2KCMBirkLH3ZnhE1Q7NpCOiuJBkhB2qgJ92dxWFmKj4k29igjAYq5Cx92Z4RNUOzaQjoriQZGQCma//vVgAAgB+fDIAAAACAAAAAAAEAAAAAAQUgnZNdhk/w7sXuE3/fLeNHq5My6f6IqMI5KrZAVeoZdnUhB52TXYZP8O7F7hN/3y3jR6uTMun+iKjCOSq2QFXqGXZ1GQCma//vVgAAgB+fDIAAAACAAAAAAAAAAAAAAQUg+5xo2r852/jJjwIpMPXdsWsse2hpIxAhJhP6YDPcrrIhB/ucaNq/Odv4yY8CKTD13bFrLHtoaSMQISYT+mAz3K6yGQCma//vVgAAgAEAAIAAAACAAQAAAAEAAAAA';
   
@@ -106,6 +119,96 @@ describe('signer', () => {
     it('should throw ValidationError for invalid seed string', async () => {
       await expect(signPsbtFromSeed('1234', utxoUnsignedPsbt, 'testnet')).rejects.toThrow(ValidationError);
     });
+  });
+
+  describe('signMessage & verifyMessage', () => {
+    const testMessage = 'RGB message signing test';
+
+    it('should sign and verify a message using account xpub', async () => {
+      const signature = await signMessage({
+        message: testMessage,
+        seed: testSeedHex,
+        network: 'testnet',
+      });
+
+      console.log('signed', signature);
+
+      expect(signature).toMatch(/^[A-Za-z0-9+/=]+$/);
+      // expect(signed.accountXpub).toMatch(/^tpub/);
+
+      const verified = await verifyMessage({
+        message: testMessage,
+        signature: signature,
+        accountXpub: expectedKeys.account_xpub_vanilla,
+        network: 'testnet',
+      });
+      expect(verified).toBe(true);
+    });
+
+    it('should verify false for tampered messages', async () => {
+      const signed = await signMessage({
+        message: testMessage,
+        seed: testSeedHex,
+        network: 'testnet',
+      });
+
+      const tampered = await verifyMessage({
+        message: `${testMessage}!`,
+        signature: signed,
+        accountXpub: expectedKeys.account_xpub_vanilla,
+        network: 'testnet',
+      });
+      expect(tampered).toBe(false);
+    });
+
+    it('should throw if seed is missing for signing', async () => {
+      await expect(signMessage({ message: testMessage } as any)).rejects.toThrow(ValidationError);
+    });
+
+    it('should throw if account xpub is missing for verification', async () => {
+      const signed = await signMessage({
+        message: testMessage,
+        seed: testSeedHex,
+        network: 'testnet',
+      });
+
+      await expect(
+        verifyMessage({
+          message: testMessage,
+          signature: signed,
+          accountXpub: '',
+          network: 'testnet',
+        })
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it('should work with Uint8Array seed input', async () => {
+      const signed = await signMessage({
+        message: testMessage,
+        seed: testSeedArray,
+        network: 'testnet',
+      });
+
+      const verified = await verifyMessage({
+        message: testMessage,
+        signature: signed,
+        accountXpub: expectedKeys.account_xpub_vanilla,
+        network: 'testnet',
+      });
+
+      expect(verified).toBe(true);
+    });
+
+    // it('should throw for invalid base64 signatures', async () => {
+    //   await expect(
+    //     verifyMessage({
+    //       message: testMessage,
+    //       signature: '!!!invalid!!!',
+    //       accountXpub: 'tpubDDMTD6EJKKLP6Gx9JUnMpjf9NYyePJszmqBnNqULNmcgEuU1yQ3JsHhWZdRFecszWETnNsmhEe9vnaNibfzZkDDHycbR2rGFbXdHWRgBfu7',
+    //       network: 'testnet',
+    //     })
+    //   ).rejects.toThrow(ValidationError);
+    // });
   });
 
 

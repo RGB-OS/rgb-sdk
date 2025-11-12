@@ -15,7 +15,7 @@ import {
   WalletBackupResponse,
   WalletRestoreResponse
 } from '../types/rgb-model';
-import { signPsbt, signPsbtFromSeed } from '../crypto';
+import { signPsbt, signPsbtFromSeed, signMessage as signSchnorrMessage, verifyMessage as verifySchnorrMessage } from '../crypto';
 import type { Network } from '../crypto';
 import { generateKeys } from '../crypto';
 import { normalizeNetwork } from '../utils/validation';
@@ -32,12 +32,14 @@ export const createWallet = async (network: string | number = 'regtest') => {
 }
 
 export type WalletInitParams = {
+ 
   xpub_van: string;
   xpub_col: string;
   rgb_node_endpoint: string;
   mnemonic?: string;
   seed?: Uint8Array;
   network?: string | number;
+  xpub?: string;
   master_fingerprint: string;
 }
 
@@ -66,6 +68,7 @@ export type WalletInitParams = {
  */
 export class WalletManager {
   private readonly client: RGBClient;
+  private readonly xpub: string | null;
   private readonly xpub_van: string;
   private readonly xpub_col: string;
   private readonly mnemonic: string | null;
@@ -101,6 +104,7 @@ export class WalletManager {
     this.xpub_col = params.xpub_col;
     this.seed = params.seed ?? null;
     this.mnemonic = params.mnemonic ?? null;
+    this.xpub = params.xpub ?? null;
     this.masterFingerprint = params.master_fingerprint;
 
     // Normalize network using utility function
@@ -280,6 +284,38 @@ export class WalletManager {
 
   public async syncWallet(): Promise<void> {
     return this.client.syncWallet();
+  }
+
+  public async signMessage(message: string): Promise<string> {
+    if (!message) {
+      throw new ValidationError('message is required', 'message');
+    }
+
+    if (!this.seed) {
+      throw new WalletError('Wallet seed is required for message signing. Initialize the wallet with a seed.');
+    }
+
+    return signSchnorrMessage({
+      message,
+      seed: this.seed,
+      network: this.network,
+    });
+  }
+
+  public async verifyMessage(message: string, signature: string, accountXpub?: string): Promise<boolean> {
+    if (!message) {
+      throw new ValidationError('message is required', 'message');
+    }
+    if (!signature) {
+      throw new ValidationError('signature is required', 'signature');
+    }
+
+    return verifySchnorrMessage({
+      message,
+      signature,
+      accountXpub: this.xpub_van,
+      network: this.network,
+    });
   }
 }
 

@@ -106,7 +106,12 @@ export interface BIP39Module {
  * ECC module interface (from @bitcoinerlab/secp256k1)
  * Note: This is a simplified interface that matches the actual ECC module
  */
-export type ECCModule = unknown;
+export interface ECCModule {
+  signSchnorr: (message: Uint8Array, privateKey: Uint8Array, auxRand?: Uint8Array) => Uint8Array;
+  verifySchnorr: (message: Uint8Array, publicKey: Uint8Array, signature: Uint8Array) => boolean;
+  xOnlyPointFromPoint: (point: Uint8Array) => Uint8Array;
+  [key: string]: unknown;
+}
 
 /**
  * BIP32 Factory function type

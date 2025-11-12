@@ -22,7 +22,6 @@
  * - Master fingerprint calculation for RGB wallets
  */
 
-import { isNode } from '../utils/environment';
 import type { BIP32Interface } from 'bip32';
 import type { Network } from './types';
 import { ValidationError, CryptoError } from '../errors';
@@ -36,76 +35,11 @@ import {
 import { calculateMasterFingerprint } from '../utils/fingerprint';
 import { normalizeSeedBuffer, toNetworkName, getNetworkVersions } from '../utils/bip32-helpers';
 import type { BIP39Module, ECCModule, BIP32Factory } from './types';
+import { ensureBaseDependencies } from './dependencies';
 
-// Dynamic imports for browser compatibility
-let bip39: BIP39Module | undefined;
-let ecc: ECCModule | undefined;
-let BIP32FactoryInstance: BIP32Factory | undefined;
+export type SeedInput = string | Uint8Array;
 
-// Load dependencies based on environment
-async function loadDependencies() {
-  if (isNode()) {
-    // Node.js: use createRequire for CommonJS modules
-    // Use dynamic import with string concatenation to prevent bundlers from analyzing it
-    const nodeModule = 'node:module';
-    const { createRequire } = await import(nodeModule);
-    // @ts-ignore - import.meta.url not available in CJS build context
-    const requireFromModule = createRequire(import.meta.url);
-    
-    bip39 = requireFromModule('bip39') as unknown as BIP39Module;
-    ecc = requireFromModule('@bitcoinerlab/secp256k1') as unknown as ECCModule;
-    const bip32 = requireFromModule('bip32') as unknown as { BIP32Factory: BIP32Factory };
-    BIP32FactoryInstance = bip32.BIP32Factory;
-  } else {
-    // Browser: use ESM imports
-    const bip39Module = await import('bip39');
-    bip39 = (bip39Module.default as unknown as BIP39Module) || (bip39Module as unknown as BIP39Module);
-    
-    // @bitcoinerlab/secp256k1 - browser-compatible, no WASM issues
-    const eccModule = await import('@bitcoinerlab/secp256k1');
-    // @bitcoinerlab/secp256k1 may export as default or named exports
-    if (eccModule.default) {
-      ecc = eccModule.default as unknown as ECCModule;
-    } else {
-      ecc = eccModule as unknown as ECCModule;
-    }
-    
-    const bip32 = await import('bip32') as unknown as { BIP32Factory: BIP32Factory };
-    BIP32FactoryInstance = bip32.BIP32Factory;
-  }
-}
-
-// Initialize dependencies - always load on first use
-let dependenciesLoaded = false;
-let dependenciesLoading: Promise<void> | null = null;
-
-async function ensureDependencies() {
-  // If already loaded, return immediately
-  if (dependenciesLoaded) {
-    return;
-  }
-  
-  // If already loading, wait for it
-  if (dependenciesLoading) {
-    await dependenciesLoading;
-    return;
-  }
-  
-  // Start loading
-  dependenciesLoading = loadDependencies().then(() => {
-    dependenciesLoaded = true;
-    dependenciesLoading = null;
-  }).catch((error) => {
-    dependenciesLoading = null;
-    throw error;
-  });
-  
-  await dependenciesLoading;
-}
-
-type SeedInput = string | Uint8Array;
-
-function normalizeSeedInput(seed: SeedInput, field: string = 'seed'): Uint8Array {
+export function normalizeSeedInput(seed: SeedInput, field: string = 'seed'): Uint8Array {
   if (typeof seed === 'string') {
     const trimmed = seed.trim();
     if (!trimmed) {
@@ -139,34 +73,6 @@ function normalizeSeedInput(seed: SeedInput, field: string = 'seed'): Uint8Array
   throw new ValidationError(`${field} must be a 64-byte hex string or Uint8Array`, field);
 }
 
-// Bip32 network versions (matches BIP32 Network schema: { bip32: { public, private }, wif })
-interface NetworkVersions {
-  bip32: {
-    public: number;
-    private: number;
-  };
-  wif: number;
-}
-
-const NETWORKS: Record<Network, NetworkVersions> = {
-  mainnet: {
-    bip32: { public: 0x0488b21e, private: 0x0488ade4 }, // xpub/xprv
-    wif: 0x80
-  },
-  testnet: {
-    bip32: { public: 0x043587cf, private: 0x04358394 }, // tpub/tprv
-    wif: 0xef
-  },
-  signet: {
-    bip32: { public: 0x043587cf, private: 0x04358394 },
-    wif: 0xef
-  },
-  regtest: {
-    bip32: { public: 0x043587cf, private: 0x04358394 },
-    wif: 0xef
-  }
-};
-
 export interface GeneratedKeys {
   mnemonic: string;
   xpub: string;
@@ -194,7 +100,7 @@ function getCoinType(bitcoinNetwork: string | number, rgb: boolean): number {
 /**
  * Generate account derivation path: m / 86' / coinType' / 0'
  */
-function accountDerivationPath(bitcoinNetwork: string | number, rgb: boolean): string {
+export function accountDerivationPath(bitcoinNetwork: string | number, rgb: boolean): string {
   const coinType = getCoinType(bitcoinNetwork, rgb);
   return `m/${DERIVATION_PURPOSE}'/${coinType}'/${DERIVATION_ACCOUNT}'`;
 }
@@ -211,30 +117,23 @@ async function masterFingerprintFromNode(node: BIP32Interface): Promise<string> 
  * Convert mnemonic to root BIP32 node
  */
 async function mnemonicToRoot(mnemonic: string, bitcoinNetwork: string | number): Promise<BIP32Interface> {
-  await ensureDependencies();
-  
-  // Check if bip39 is loaded correctly
+  const { bip39, ecc, factory } = await ensureBaseDependencies();
+
   if (!bip39 || typeof bip39.mnemonicToSeedSync !== 'function') {
     throw new CryptoError('bip39 module not loaded correctly');
   }
-  
-  const seed = bip39!.mnemonicToSeedSync(mnemonic);
-  
-  // Normalize seed buffer using shared utility
-  const seedBuffer = normalizeSeedBuffer(seed);
-  
+
+  const seedBuffer = normalizeSeedBuffer(bip39.mnemonicToSeedSync(mnemonic));
   const versions = getNetworkVersions(bitcoinNetwork);
-  
-  if (!ecc || !BIP32FactoryInstance) {
-    throw new CryptoError('ECC or BIP32Factory not loaded');
-  }
-  
-  const bip32 = BIP32FactoryInstance(ecc);
-  
+  const bip32 = factory(ecc);
+
   try {
     return bip32.fromSeed(seedBuffer, versions);
   } catch (error) {
-    throw new CryptoError(`Failed to create BIP32 root node from seed: ${error instanceof Error ? error.message : String(error)}`, error as Error);
+    throw new CryptoError(
+      `Failed to create BIP32 root node from seed: ${error instanceof Error ? error.message : String(error)}`,
+      error as Error
+    );
   }
 }
 
@@ -264,21 +163,47 @@ async function getMasterXpriv(mnemonic: string, bitcoinNetwork: string | number)
   return root.toBase58();
 }
 
+function deriveAccountXpubsFromRoot(root: BIP32Interface, network: Network) {
+  const vanillaPath = accountDerivationPath(network, false);
+  const coloredPath = accountDerivationPath(network, true);
+
+  return {
+    account_xpub_vanilla: root.derivePath(vanillaPath).neutered().toBase58(),
+    account_xpub_colored: root.derivePath(coloredPath).neutered().toBase58(),
+  };
+}
+
+async function buildGeneratedKeysFromRoot(
+  root: BIP32Interface,
+  network: Network,
+  mnemonic: string
+): Promise<GeneratedKeys> {
+  const xpub = root.neutered().toBase58();
+  const xpriv = root.toBase58();
+  const master_fingerprint = await masterFingerprintFromNode(root);
+  const { account_xpub_vanilla, account_xpub_colored } = deriveAccountXpubsFromRoot(root, network);
+
+  return {
+    mnemonic,
+    xpub,
+    account_xpub_vanilla,
+    account_xpub_colored,
+    master_fingerprint,
+    xpriv,
+  };
+}
+
 /**
  * Get extended public key (xpub) from extended private key (xpriv)
  * Internal helper function
  */
 async function getXpubFromXprivInternal(xpriv: string, bitcoinNetwork?: string | number): Promise<string> {
-  await ensureDependencies();
-  
-  if (!ecc || !BIP32FactoryInstance) {
-    throw new CryptoError('ECC or BIP32Factory not loaded');
-  }
-  
+  const { ecc, factory } = await ensureBaseDependencies();
+
   try {
     // BIP32Factory is a factory function that returns BIP32 interface
     // Use it to create a BIP32 instance from the xpriv
-    const bip32 = BIP32FactoryInstance(ecc);
+    const bip32 = factory(ecc);
     
     // fromBase58 requires network versions for validation
     // If network is not provided, try to infer from xpriv prefix (xprv/tprv for mainnet/testnet)
@@ -304,34 +229,17 @@ async function getXpubFromXprivInternal(xpriv: string, bitcoinNetwork?: string |
  * Build complete keys output object from mnemonic
  */
 async function buildKeysOutput(mnemonic: string, bitcoinNetwork: string | number): Promise<GeneratedKeys> {
-  const root = await mnemonicToRoot(mnemonic, bitcoinNetwork);
-  const xpub = root.neutered().toBase58();
-  const xpriv = root.toBase58();
-  const master_fingerprint = await masterFingerprintFromNode(root);
-
-  const account_xpub_vanilla = await getAccountXpub(mnemonic, bitcoinNetwork, false);
-  const account_xpub_colored = await getAccountXpub(mnemonic, bitcoinNetwork, true);
-
-  return {
-    mnemonic,
-    xpub,
-    account_xpub_vanilla,
-    account_xpub_colored,
-    master_fingerprint,
-    xpriv
-  };
+  const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
+  const root = await mnemonicToRoot(mnemonic, normalizedNetwork);
+  return buildGeneratedKeysFromRoot(root, normalizedNetwork, mnemonic);
 }
 
 async function buildKeysOutputFromSeed(seed: Uint8Array | Buffer, bitcoinNetwork: string | number): Promise<GeneratedKeys> {
-  await ensureDependencies();
-
-  if (!BIP32FactoryInstance || !ecc) {
-    throw new CryptoError('BIP32Factory or ECC not loaded');
-  }
-
+  const { ecc, factory } = await ensureBaseDependencies();
+  const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
   const seedBuffer = normalizeSeedBuffer(seed);
   const versions = getNetworkVersions(bitcoinNetwork);
-  const bip32 = BIP32FactoryInstance(ecc);
+  const bip32 = factory(ecc);
 
   let root: BIP32Interface;
   try {
@@ -340,64 +248,24 @@ async function buildKeysOutputFromSeed(seed: Uint8Array | Buffer, bitcoinNetwork
     throw new CryptoError('Failed to create BIP32 root node from seed', error as Error);
   }
 
-  const xpub = root.neutered().toBase58();
-  const xpriv = root.toBase58();
-  const master_fingerprint = await masterFingerprintFromNode(root);
-
-  const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
-  const vanillaPath = accountDerivationPath(normalizedNetwork, false);
-  const coloredPath = accountDerivationPath(normalizedNetwork, true);
-
-  const account_xpub_vanilla = root.derivePath(vanillaPath).neutered().toBase58();
-  const account_xpub_colored = root.derivePath(coloredPath).neutered().toBase58();
-
-  return {
-    mnemonic: '',
-    xpub,
-    account_xpub_vanilla,
-    account_xpub_colored,
-    master_fingerprint,
-    xpriv
-  };
+  return buildGeneratedKeysFromRoot(root, normalizedNetwork, '');
 }
 
 /**
  * Build complete keys output object from xpriv
  */
 async function buildKeysOutputFromXpriv(xpriv: string, bitcoinNetwork: string | number): Promise<GeneratedKeys> {
-  await ensureDependencies();
-  
-  if (!BIP32FactoryInstance || !ecc) {
-    throw new CryptoError('BIP32Factory or ECC not loaded');
-  }
-  
+  const { ecc, factory } = await ensureBaseDependencies();
   try {
     // BIP32Factory is a factory function that returns BIP32 interface
-    const bip32 = BIP32FactoryInstance(ecc);
+    const bip32 = factory(ecc);
     
     // Get network versions for validation
+    const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
     const versions = getNetworkVersions(bitcoinNetwork);
     const root = bip32.fromBase58(xpriv, versions);
     
-    const xpub = root.neutered().toBase58();
-    const xprivNormalized = root.toBase58();
-    const master_fingerprint = await masterFingerprintFromNode(root);
-    
-    const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
-    const vanillaPath = accountDerivationPath(normalizedNetwork, false);
-    const coloredPath = accountDerivationPath(normalizedNetwork, true);
-    
-    const account_xpub_vanilla = root.derivePath(vanillaPath).neutered().toBase58();
-    const account_xpub_colored = root.derivePath(coloredPath).neutered().toBase58();
-    
-    return {
-      mnemonic: '', // Not available from xpriv
-      xpub,
-      account_xpub_vanilla,
-      account_xpub_colored,
-      master_fingerprint,
-      xpriv: xprivNormalized
-    };
+    return buildGeneratedKeysFromRoot(root, normalizedNetwork, '');
   } catch (error) {
     throw new CryptoError('Failed to derive keys from xpriv', error as Error);
   }
@@ -420,7 +288,7 @@ async function buildKeysOutputFromXpriv(xpriv: string, bitcoinNetwork: string | 
  */
 export async function generateKeys(bitcoinNetwork: string | number = 'regtest'): Promise<GeneratedKeys> {
   try {
-    await ensureDependencies();
+    const { bip39 } = await ensureBaseDependencies();
     if (!bip39 || typeof (bip39 as any).generateMnemonic !== 'function') {
       throw new Error('bip39 not loaded. Dependencies may not have initialized correctly.');
     }
@@ -465,7 +333,7 @@ export async function deriveKeysFromMnemonic(
   const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
   
   try {
-    await ensureDependencies();
+    const { bip39 } = await ensureBaseDependencies();
     const trimmedMnemonic = mnemonic.trim();
     if (!bip39 || !bip39.validateMnemonic(trimmedMnemonic)) {
       throw new ValidationError('Invalid mnemonic format - failed BIP39 validation', 'mnemonic');
@@ -632,7 +500,7 @@ export async function accountXpubsFromMnemonic(
   validateMnemonic(mnemonic, 'mnemonic');
   
   try {
-    await ensureDependencies();
+    const { bip39 } = await ensureBaseDependencies();
     if (!bip39 || !bip39.validateMnemonic(mnemonic)) {
       throw new ValidationError('Invalid mnemonic format - failed BIP39 validation', 'mnemonic');
     }

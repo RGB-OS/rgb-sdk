@@ -12,7 +12,7 @@ export type { Network, PsbtType, SignPsbtOptions, NetworkVersions, Descriptors }
 export type { GeneratedKeys, AccountXpubs } from './crypto';
 
 // Function exports
-export { signPsbt, signPsbtSync, signPsbtFromSeed } from './crypto';
+export { signPsbt, signPsbtSync, signPsbtFromSeed, signMessage, verifyMessage } from './crypto';
 export { 
   generateKeys, 
   deriveKeysFromMnemonic, 
