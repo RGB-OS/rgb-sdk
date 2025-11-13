@@ -13,13 +13,16 @@ import {
   Unspent,
   RgbTransfer,
   WalletBackupResponse,
-  WalletRestoreResponse
+  WalletRestoreResponse,
+  SendBtcBeginRequestModel,
+  SendBtcEndRequestModel,
+  GetFeeEstimationResponse
 } from '../types/rgb-model';
-import { signPsbt, signPsbtFromSeed, signMessage as signSchnorrMessage, verifyMessage as verifySchnorrMessage } from '../crypto';
-import type { Network } from '../crypto';
+import { signPsbt, signPsbtFromSeed, signMessage as signSchnorrMessage, verifyMessage as verifySchnorrMessage, estimatePsbt } from '../crypto';
+import type { EstimatePsbtResult, Network } from '../crypto';
 import { generateKeys } from '../crypto';
 import { normalizeNetwork } from '../utils/validation';
-import { ValidationError, WalletError } from '../errors';
+import { ValidationError, WalletError, CryptoError } from '../errors';
 import type { Readable } from 'stream';
 
 /**
@@ -170,6 +173,37 @@ export class WalletManager {
     return this.client.sendEnd(params);
   }
 
+  public async sendBtcBegin(params: SendBtcBeginRequestModel): Promise<string> {
+    return this.client.sendBtcBegin(params);
+  }
+
+  public async sendBtcEnd(params: SendBtcEndRequestModel): Promise<string> {
+    return this.client.sendBtcEnd(params);
+  }
+
+  public async getFeeEstimation(blocks: number): Promise<GetFeeEstimationResponse> {
+    if (!Number.isFinite(blocks)) {
+      throw new ValidationError('blocks must be a finite number', 'blocks');
+    }
+    if (!Number.isInteger(blocks) || blocks <= 0) {
+      throw new ValidationError('blocks must be a positive integer', 'blocks');
+    }
+
+    return this.client.getFeeEstimation({ blocks });
+  }
+
+  public async getPsbtCost(psbtBase64: string): Promise<EstimatePsbtResult> {
+     return await estimatePsbt(psbtBase64);
+  }
+
+  public async sendBtc(params: SendBtcBeginRequestModel): Promise<string> {
+    const psbt = await this.sendBtcBegin(params);
+    // TODO: sign PSBT here when ready.
+    const signed = await this.signPsbt(psbt);
+    return this.sendBtcEnd({ signed_psbt: signed });
+    // return psbt;
+  }
+
   public async blindReceive(params: InvoiceRequest): Promise<InvoiceReceiveData> {
     return this.client.blindReceive(params);
   }
@@ -273,6 +307,7 @@ export class WalletManager {
   public async send(invoiceTransfer: SendAssetBeginRequestModel, mnemonic?: string): Promise<string> {
     const psbt = await this.sendBegin(invoiceTransfer);
     const signed_psbt = await this.signPsbt(psbt, mnemonic);
+    console.log('send signed_psbt', signed_psbt);
     return await this.sendEnd({ signed_psbt });
   }
 
@@ -317,6 +352,7 @@ export class WalletManager {
       network: this.network,
     });
   }
+
 }
 
 /**

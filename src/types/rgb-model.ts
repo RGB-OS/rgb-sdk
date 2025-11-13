@@ -49,6 +49,23 @@ export interface SendAssetBeginRequestModel {
 export interface SendAssetEndRequestModel {
   signed_psbt: string;
 }
+export interface SendBtcBeginRequestModel {
+  address: string;
+  amount: number;
+  fee_rate: number;
+  skip_sync?: boolean;
+}
+export interface SendBtcEndRequestModel {
+  signed_psbt: string;
+  skip_sync?: boolean;
+}
+
+export interface GetFeeEstimationRequestModel {
+  blocks: number;
+}
+
+export type GetFeeEstimationResponse = Record<string, number> | number;
+
 export interface RgbTransfer {
   idx: number;
   batch_transfer_idx: number;

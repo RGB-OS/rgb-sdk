@@ -1,6 +1,7 @@
 // Import from built ESM dist files
 // Using dynamic import to handle WASM modules with experimental flags
 import { signPsbt, signPsbtFromSeed, signMessage, verifyMessage, ValidationError, CryptoError } from '../dist/index.mjs';
+import { estimatePsbt } from '../src/crypto/signer';
 import bip39 from 'bip39';
 const expectedKeys = {
   xpub: 'tpubD6NzVbkrYhZ4XCaTDersU6277zvyyV6uCCeEgx1jfv7bUYMrbTt8Vem1MBt5Gmp7eMwjv4rB54s2kjqNNtTLYpwFsVX7H2H93pJ8SpZFRRi',
@@ -131,8 +132,6 @@ describe('signer', () => {
         network: 'testnet',
       });
 
-      console.log('signed', signature);
-
       expect(signature).toMatch(/^[A-Za-z0-9+/=]+$/);
       // expect(signed.accountXpub).toMatch(/^tpub/);
 
@@ -208,6 +207,31 @@ describe('signer', () => {
     //       network: 'testnet',
     //     })
     //   ).rejects.toThrow(ValidationError);
+    // });
+  });
+const testPP = 'cHNidP8BALICAAAAApA+sGHFsAZWB6V4uOxVRz6GSdeRVpGoKsR0CcPjwUMwAQAAAAD9////5f5/uG50E2VjtR6FQnpBvl6TOVh/3SO/ub/9P/3IypgCAAAAAP3///8CAAAAAAAAAAAiaiAtAD8u9+XBpITGaeZcJ1j+JLJyy9eNHk7p3VLvVlrRtegDAAAAAAAAIlEg4SPaJcwZIPMpEuCdOS0bJdPWXUAE+anLUPWrGdBMfOwrAwAAJvwDUkdCAY/wquJLj9AGfn1A55WBSyAPZYV4MKoTWSzYvYbwWoNgqgAAJcyA6bzdL8lfRNaLuzfpKTbKf52bQ7LuH/+U+sEGXiz//////////xAnAAABAErbIWzDQ2apq/8fALJrQP+3RackqnF+h6TTyXeEoJSdoA8AAAEAoA8BAgAAAAEAAAB/lKqTNMjHNQgKAAAAAAAAAAAB5f5/uG50E2VjtR6FQnpBvl6TOVh/3SO/ub/9P/3IypgAAAAAPaDn1xl+gOQI9QIAAAAAAAAABvwDUkdCAgEAJvwDUkdCBCXMgOm83S/JX0TWi7s36Sk2yn+dm0Oy7h//lPrBBl4sRErbIWzDQ2apq/8fALJrQP+3RackqnF+h6TTyXeEoJSdoA8AAI/wquJLj9AGfn1A55WBSyAPZYV4MKoTWSzYvYbwWoNgAAEBK0sEAAAAAAAAIlEgjmL+mV2AUe+miOTfBOstDmrB2RSdO5T/eY5+wloHxWcBCEIBQDPY8uz1YXDRD1SuiMtn33/eGTaNjUh+aZgXX5dwqC6ldFY5KPm1/R52fib2FELGmrGc8IoE8WRataGjl2EumoUAAQEr6AMAAAAAAAAiUSBV7Deq1ZxYjT2iY7ogYcQ/P1UcqmvP1ZoWxhanrBXn0wEIQgFAP7bQo/PGq/u/oQWQINWbCYAO11/uEQOCRawXR7kjZi8PgBU5gCZGpyZOdZaNVODJbAZHIUOBgLXjEPmFNP9AowAm/ANNUEMAJcyA6bzdL8lfRNaLuzfpKTbKf52bQ7LuH/+U+sEGXiwgCR+S1pC9VyIRFmuV735GaCOfn2poXJwqA2+BB7WnKloG/ANNUEMBCJ4jY7shMLPMBvwDTVBDECAtAD8u9+XBpITGaeZcJ1j+JLJyy9eNHk7p3VLvVlrRtQb8A01QQxH9PwEDAAAIAAAAAAPblM4qpqhe32crMFATmnncoEyRmtm2q19CKMKEmo96PgADeR1/mSCCMrAw//3BWh8ltdkz4YeSnFfLAVsIdMSyE9gAA4FY4lxBPRjJskoHvKer8MXXefl5o+qdp1bd6dfognkwAANjT/xN81Cu737l3tKbwAwq18X/vUZ3qtvPOcduu3OC0wADWe0kkhfqEWSbttn4foGOIpChREwccE1HaifyiXenSv4BJcyA6bzdL8lfRNaLuzfpKTbKf52bQ7LuH/+U+sEGXiwJH5LWkL1XIhEWa5XvfkZoI5+famhcnCoDb4EHtacqWgADu0MacnHxguDIx16xDm1OF27T4OtDBKit94fQviHfVO8AA42s+5hkizFFwwQS8w4uKBMp9K6YdF5N+VBdfOtIOeYJAZ4jY7shMLPMCPwFT1BSRVQBIC0APy735cGkhMZp5lwnWP4ksnLL140eTundUu9WWtG1AAA='
+  describe('estimatePsbt', () => {
+    it('should estimate metrics for an unsigned PSBT', async () => {
+      const estimate = await estimatePsbt(testPP);
+
+      console.log('estimate', estimate);
+      expect(estimate).toHaveProperty('feeSats');
+      expect(estimate).toHaveProperty('feeBtc');
+      expect(estimate).toHaveProperty('vbytes');
+      expect(estimate).toHaveProperty('feeRate');
+
+      expect(typeof estimate.feeSats).toBe('number');
+      expect(typeof estimate.feeBtc).toBe('string');
+      expect(typeof estimate.vbytes).toBe('number');
+      expect(typeof estimate.feeRate).toBe('number');
+
+      expect(estimate.feeSats).toBeGreaterThanOrEqual(0);
+      expect(estimate.vbytes).toBeGreaterThan(0);
+      expect(estimate.feeRate).toBeGreaterThanOrEqual(0);
+    });
+
+    // it('should throw ValidationError for invalid PSBT input', async () => {
+    //   await expect(estimatePsbt('not-a-psbt')).rejects.toThrow(ValidationError);
     // });
   });
 

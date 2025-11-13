@@ -18,7 +18,11 @@ import {
   SendAssetEndRequestModel,
   Unspent,
   WalletBackupResponse,
-  WalletRestoreResponse
+  WalletRestoreResponse,
+  SendBtcBeginRequestModel,
+  SendBtcEndRequestModel,
+  GetFeeEstimationRequestModel,
+  GetFeeEstimationResponse
 } from "../types/rgb-model";
 
 /**
@@ -116,6 +120,18 @@ export class RGBClient {
 
   async sendEnd(params: SendAssetEndRequestModel): Promise<string> {
     return this.request<string>("post", "/wallet/sendend", params);
+  }
+
+  async sendBtcBegin(params: SendBtcBeginRequestModel): Promise<string> {
+    return this.request<string>("post", "/wallet/sendbtcbegin", params);
+  }
+
+  async sendBtcEnd(params: SendBtcEndRequestModel): Promise<string> {
+    return this.request<string>("post", "/wallet/sendbtcend", params);
+  }
+
+  async getFeeEstimation(params: GetFeeEstimationRequestModel): Promise<GetFeeEstimationResponse> {
+    return this.request<GetFeeEstimationResponse>("post", "/wallet/get_fee_estimation", params);
   }
 
   async blindReceive(params: InvoiceRequest): Promise<InvoiceReceiveData> {

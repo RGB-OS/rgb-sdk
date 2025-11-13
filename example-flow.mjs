@@ -163,11 +163,48 @@ async function main() {
         console.log("\nInitializing receiving wallet...");
         const { wallet: receiverWallet } = await initWallet(null);
 
+
+        const btcAddress = await receiverWallet.getAddress();
+        console.log("BTC address:", btcAddress);
+        await receiverWallet.syncWallet();
+        const btcBalance2 = await receiverWallet.getBtcBalance();
+        console.log("BTC balance:", JSON.stringify(btcBalance2));
+
+        // Send BTC to the address
+        const psbt = await senderWallet.sendBtcBegin({
+            address: btcAddress,
+            amount: 7000,
+            fee_rate: 1
+        });
+        console.log("PSBT:", psbt);
+        // const btcEstimate = await senderWallet.estimatePsbtCost(psbt);
+        // console.log("BTC send estimate:", btcEstimate);
+        const signedPsbt = await senderWallet.signPsbt(psbt);
+        console.log("Signed PSBT:", signedPsbt);
+        const result = await senderWallet.sendBtcEnd({ signed_psbt: signedPsbt });
+        console.log("Send BTC result:", result);
+    //    const result = await senderWallet.sendBtc({
+    //         address: btcAddress,
+    //         amount: 7000,
+    //         fee_rate: 1
+    //     });
+
+        console.log("Send BTC result:", result);
+
+        mine(10);
+        // Wait for confirmation
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await receiverWallet.syncWallet();
+
+
+        const btcBalance = await receiverWallet.getBtcBalance();
+        console.log("BTC balance:", JSON.stringify(btcBalance));
+// return;
         // Create blind receive
         console.log("\nCreating blind receive...");
         const receiveData1 = await receiverWallet.blindReceive({
             // asset_id: asset1.asset?.asset_id || '',
-            amount: 10
+            amount: 76
         });
         console.log("Blind receive data:", JSON.stringify(receiveData1, null, 2));
 
@@ -176,7 +213,7 @@ async function main() {
         console.log("\nSending assets...", asset1);
         const sendResult = await senderWallet.send({
             asset_id: asset1.asset_id,
-            amount: 10,
+            amount: 76,
             invoice: receiveData1.invoice,
             min_confirmations: 1
         });

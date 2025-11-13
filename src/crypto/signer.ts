@@ -476,6 +476,11 @@ export interface VerifyMessageParams {
   network?: Network;
 }
 
+export interface EstimatePsbtResult {
+  fee: number;
+  vbytes: number;
+  feeRate: number;
+}
 export async function signMessage(params: SignMessageParams): Promise<string> {
   const { message, seed } = params;
   if (!seed) {
@@ -539,4 +544,34 @@ export async function verifyMessage(params: VerifyMessageParams): Promise<boolea
     return false;
   }
 }
+
+export async function estimatePsbt(psbtBase64: string): Promise<EstimatePsbtResult> {
+  if (!psbtBase64) {
+    throw new ValidationError('psbt is required', 'psbt');
+  }
+
+  const { Psbt } = await ensureSignerDependencies();
+  if (!Psbt) {
+    throw new CryptoError('BitcoinJS Psbt module not loaded');
+  }
+
+  let psbt: BitcoinJsPsbt;
+  try {
+    psbt = Psbt.fromBase64(psbtBase64.trim()) as BitcoinJsPsbt;
+    return {
+      fee: psbt.getFee(),
+      feeRate: psbt.getFeeRate(),
+      vbytes: psbt.extractTransaction().virtualSize(),
+    };    
+  } catch (error) {
+    console.log('error', error);
+    throw new ValidationError('Invalid PSBT provided', 'psbt');
+  }
+}
+
+
+
+
+
+
 
