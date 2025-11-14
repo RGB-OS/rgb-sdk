@@ -7,6 +7,8 @@ import { createClient } from "./http-client";
 import {
   AssetBalanceResponse,
   BtcBalance,
+  CreateUtxosBeginRequestModel,
+  CreateUtxosEndRequestModel,
   FailTransfersRequest,
   InvoiceReceiveData,
   InvoiceRequest,
@@ -16,13 +18,16 @@ import {
   RgbTransfer,
   SendAssetBeginRequestModel,
   SendAssetEndRequestModel,
+  SendResult,
+  Transaction,
   Unspent,
   WalletBackupResponse,
   WalletRestoreResponse,
   SendBtcBeginRequestModel,
   SendBtcEndRequestModel,
   GetFeeEstimationRequestModel,
-  GetFeeEstimationResponse
+  GetFeeEstimationResponse,
+  AssetNIA
 } from "../types/rgb-model";
 
 /**
@@ -106,11 +111,11 @@ export class RGBClient {
     return this.request("post", "/wallet/listunspents");
   }
 
-  async createUtxosBegin(params: { up_to?: boolean; num?: number; size?: number; fee_rate?: number }): Promise<string> {
+  async createUtxosBegin(params: CreateUtxosBeginRequestModel): Promise<string> {
     return this.request<string>("post", "/wallet/createutxosbegin", params);
   }
 
-  async createUtxosEnd(params: { signed_psbt: string }): Promise<number> {
+  async createUtxosEnd(params: CreateUtxosEndRequestModel): Promise<number> {
     return this.request<number>("post", "/wallet/createutxosend", params);
   }
 
@@ -118,8 +123,8 @@ export class RGBClient {
     return this.request<string>("post", "/wallet/sendbegin", params);
   }
 
-  async sendEnd(params: SendAssetEndRequestModel): Promise<string> {
-    return this.request<string>("post", "/wallet/sendend", params);
+  async sendEnd(params: SendAssetEndRequestModel): Promise<SendResult> {
+    return this.request<SendResult>("post", "/wallet/sendend", params);
   }
 
   async sendBtcBegin(params: SendBtcBeginRequestModel): Promise<string> {
@@ -146,8 +151,8 @@ export class RGBClient {
     return this.request<AssetBalanceResponse>("post", "/wallet/assetbalance", { asset_id });
   }
 
-  async issueAssetNia(params: { ticker: string; name: string; amounts: number[]; precision: number }): Promise<IssueAssetNIAResponse> {
-    return this.request<IssueAssetNIAResponse>("post", "/wallet/issueassetnia", params);
+  async issueAssetNia(params: { ticker: string; name: string; amounts: number[]; precision: number }): Promise<AssetNIA> {
+    return this.request<AssetNIA>("post", "/wallet/issueassetnia", params);
   }
 
   async listAssets(): Promise<ListAssetsResponse> {
@@ -166,8 +171,8 @@ export class RGBClient {
     await this.request<void>("post", "/wallet/drop");
   }
 
-  async listTransactions(): Promise<any> {
-    return this.request<any>("post", "/wallet/listtransactions");
+  async listTransactions(): Promise<Transaction[]> {
+    return this.request<Transaction[]>("post", "/wallet/listtransactions");
   }
 
   async listTransfers(asset_id: string): Promise<RgbTransfer[]> {

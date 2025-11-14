@@ -1,3 +1,4 @@
+import type { Readable } from 'stream';
 
 export type RGBHTTPClientParams = {
   xpub_van: string;
@@ -20,6 +21,16 @@ export interface WalletBackupResponse {
 export interface WalletRestoreResponse {
   message: string;
 }
+
+export interface RestoreWalletRequestModel {
+  backup: Buffer | Uint8Array | ArrayBuffer | Readable;
+  password: string;
+  filename?: string;
+  xpub_van?: string;
+  xpub_col?: string;
+  master_fingerprint?: string;
+}
+
 export interface WitnessData {
   amount_sat: number;
   blinding?: number;
@@ -49,6 +60,23 @@ export interface SendAssetBeginRequestModel {
 export interface SendAssetEndRequestModel {
   signed_psbt: string;
 }
+
+export interface SendResult {
+  txid: string;
+  batch_transfer_idx: number;
+}
+
+export interface CreateUtxosBeginRequestModel {
+  up_to?: boolean;
+  num?: number;
+  size?: number;
+  fee_rate?: number;
+}
+
+export interface CreateUtxosEndRequestModel {
+  signed_psbt: string;
+}
+
 export interface SendBtcBeginRequestModel {
   address: string;
   amount: number;
@@ -65,6 +93,27 @@ export interface GetFeeEstimationRequestModel {
 }
 
 export type GetFeeEstimationResponse = Record<string, number> | number;
+
+export enum TransactionType {
+  RGB_SEND = 0,
+  DRAIN = 1,
+  CREATE_UTXOS = 2,
+  USER = 3,
+}
+
+export interface BlockTime {
+  height: number;
+  timestamp: number;
+}
+
+export interface Transaction {
+  transaction_type: TransactionType;
+  txid: string;
+  received: number;
+  sent: number;
+  fee: number;
+  confirmation_time?: BlockTime;
+}
 
 export interface RgbTransfer {
   idx: number;

@@ -1,5 +1,7 @@
 import { RGBClient } from '../client/index';
 import {
+  CreateUtxosBeginRequestModel,
+  CreateUtxosEndRequestModel,
   FailTransfersRequest,
   InvoiceRequest,
   InvoiceReceiveData,
@@ -7,23 +9,28 @@ import {
   IssueAssetNIAResponse,
   SendAssetBeginRequestModel,
   SendAssetEndRequestModel,
+  SendResult,
   AssetBalanceResponse,
   BtcBalance,
   ListAssetsResponse,
+  Transaction,
   Unspent,
   RgbTransfer,
   WalletBackupResponse,
   WalletRestoreResponse,
+  RestoreWalletRequestModel,
   SendBtcBeginRequestModel,
   SendBtcEndRequestModel,
-  GetFeeEstimationResponse
+  GetFeeEstimationResponse,
+  AssetNIA
 } from '../types/rgb-model';
 import { signPsbt, signPsbtFromSeed, signMessage as signSchnorrMessage, verifyMessage as verifySchnorrMessage, estimatePsbt } from '../crypto';
-import type { EstimatePsbtResult, Network } from '../crypto';
+import type { EstimateFeeResult, Network } from '../crypto';
 import { generateKeys } from '../crypto';
 import { normalizeNetwork } from '../utils/validation';
 import { ValidationError, WalletError, CryptoError } from '../errors';
 import type { Readable } from 'stream';
+
 
 /**
  * Generate a new wallet with keys
@@ -157,11 +164,11 @@ export class WalletManager {
     return this.client.getAssetBalance(asset_id);
   }
 
-  public async createUtxosBegin(params: { up_to?: boolean; num?: number; size?: number; fee_rate?: number }): Promise<string> {
+  public async createUtxosBegin(params: CreateUtxosBeginRequestModel): Promise<string> {
     return this.client.createUtxosBegin(params);
   }
 
-  public async createUtxosEnd(params: { signed_psbt: string }): Promise<number> {
+  public async createUtxosEnd(params: CreateUtxosEndRequestModel): Promise<number> {
     return this.client.createUtxosEnd(params);
   }
 
@@ -169,7 +176,7 @@ export class WalletManager {
     return this.client.sendBegin(params);
   }
 
-  public async sendEnd(params: SendAssetEndRequestModel): Promise<string> {
+  public async sendEnd(params: SendAssetEndRequestModel): Promise<SendResult> {
     return this.client.sendEnd(params);
   }
 
@@ -181,7 +188,7 @@ export class WalletManager {
     return this.client.sendBtcEnd(params);
   }
 
-  public async getFeeEstimation(blocks: number): Promise<GetFeeEstimationResponse> {
+  public async estimateFeeRate(blocks: number): Promise<GetFeeEstimationResponse> {
     if (!Number.isFinite(blocks)) {
       throw new ValidationError('blocks must be a finite number', 'blocks');
     }
@@ -192,16 +199,14 @@ export class WalletManager {
     return this.client.getFeeEstimation({ blocks });
   }
 
-  public async getPsbtCost(psbtBase64: string): Promise<EstimatePsbtResult> {
+  public async estimateFee(psbtBase64: string): Promise<EstimateFeeResult> {
      return await estimatePsbt(psbtBase64);
   }
 
   public async sendBtc(params: SendBtcBeginRequestModel): Promise<string> {
     const psbt = await this.sendBtcBegin(params);
-    // TODO: sign PSBT here when ready.
     const signed = await this.signPsbt(psbt);
     return this.sendBtcEnd({ signed_psbt: signed });
-    // return psbt;
   }
 
   public async blindReceive(params: InvoiceRequest): Promise<InvoiceReceiveData> {
@@ -212,7 +217,7 @@ export class WalletManager {
     return this.client.witnessReceive(params);
   }
 
-  public async issueAssetNia(params: IssueAssetNiaRequestModel): Promise<IssueAssetNIAResponse> {
+  public async issueAssetNia(params: IssueAssetNiaRequestModel): Promise<AssetNIA> {
     return this.client.issueAssetNia(params);
   }
 
@@ -220,7 +225,7 @@ export class WalletManager {
     return this.client.refreshWallet();
   }
 
-  public async listTransactions(): Promise<unknown> {
+  public async listTransactions(): Promise<Transaction[]> {
     return this.client.listTransactions();
   }
 
@@ -247,14 +252,7 @@ export class WalletManager {
     return this.client.downloadBackup(backupId ?? this.xpub_van);
   }
 
-  public async restoreFromBackup(params: {
-    backup: Buffer | Uint8Array | ArrayBuffer | Readable;
-    password: string;
-    filename?: string;
-    xpub_van?: string;
-    xpub_col?: string;
-    master_fingerprint?: string;
-  }): Promise<WalletRestoreResponse> {
+  public async restoreFromBackup(params: RestoreWalletRequestModel): Promise<WalletRestoreResponse> {
     const {
       backup,
       password,
@@ -304,7 +302,7 @@ export class WalletManager {
    * @param invoiceTransfer - Transfer invoice parameters
    * @param mnemonic - Optional mnemonic for signing
    */
-  public async send(invoiceTransfer: SendAssetBeginRequestModel, mnemonic?: string): Promise<string> {
+  public async send(invoiceTransfer: SendAssetBeginRequestModel, mnemonic?: string): Promise<SendResult> {
     const psbt = await this.sendBegin(invoiceTransfer);
     const signed_psbt = await this.signPsbt(psbt, mnemonic);
     console.log('send signed_psbt', signed_psbt);

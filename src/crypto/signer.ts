@@ -476,7 +476,7 @@ export interface VerifyMessageParams {
   network?: Network;
 }
 
-export interface EstimatePsbtResult {
+export interface EstimateFeeResult {
   fee: number;
   vbytes: number;
   feeRate: number;
@@ -545,7 +545,7 @@ export async function verifyMessage(params: VerifyMessageParams): Promise<boolea
   }
 }
 
-export async function estimatePsbt(psbtBase64: string): Promise<EstimatePsbtResult> {
+export async function estimatePsbt(psbtBase64: string): Promise<EstimateFeeResult> {
   if (!psbtBase64) {
     throw new ValidationError('psbt is required', 'psbt');
   }
