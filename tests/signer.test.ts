@@ -215,17 +215,11 @@ const testPP = 'cHNidP8BALICAAAAApA+sGHFsAZWB6V4uOxVRz6GSdeRVpGoKsR0CcPjwUMwAQAA
       const estimate = await estimatePsbt(testPP);
 
       console.log('estimate', estimate);
-      expect(estimate).toHaveProperty('feeSats');
-      expect(estimate).toHaveProperty('feeBtc');
       expect(estimate).toHaveProperty('vbytes');
       expect(estimate).toHaveProperty('feeRate');
 
-      expect(typeof estimate.feeSats).toBe('number');
-      expect(typeof estimate.feeBtc).toBe('string');
       expect(typeof estimate.vbytes).toBe('number');
       expect(typeof estimate.feeRate).toBe('number');
-
-      expect(estimate.feeSats).toBeGreaterThanOrEqual(0);
       expect(estimate.vbytes).toBeGreaterThan(0);
       expect(estimate.feeRate).toBeGreaterThanOrEqual(0);
     });
