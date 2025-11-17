@@ -3,6 +3,8 @@
 
 This is the underlying SDK used by RGB client applications. It provides a complete set of TypeScript/Node.js bindings for interacting with the **RGB Node** and managing RGB-based transfers.
 
+> **RGB Node**: This SDK requires an RGB Node instance to function. For more information about RGB Node, including setup instructions, public andpoints and API documentation, see the [RGB Node repository](https://github.com/RGB-OS/RGB-Node/tree/public).
+
 ---
 
 ## 🧰 What You Can Do with This Library
@@ -70,6 +72,13 @@ This pattern enables advanced use cases, such as:
 ---
 
 ## Getting Started
+
+### Prerequisites
+
+Before using this SDK, you'll need an RGB Node instance running. You can:
+
+- Use the public RGB Node endpoints (testnet/mainnet) - see [RGB Node repository](https://github.com/RGB-OS/RGB-Node/tree/public) for details
+- Self-host your own RGB Node instance - see [RGB Node repository](https://github.com/RGB-OS/RGB-Node/tree/public) for setup instructions
 
 ### Installation
 
