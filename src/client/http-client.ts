@@ -19,7 +19,6 @@ export const createClient = (params: RGBHTTPClientParams): AxiosInstance => {
 
   const client = axios.create({
     baseURL: rgbEndpoint,
-    timeout: DEFAULT_API_TIMEOUT,
     headers: {
       "xpub-van": xpub_van,
       "xpub-col": xpub_col,

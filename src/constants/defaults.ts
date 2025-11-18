@@ -10,7 +10,7 @@ export const DEFAULT_NETWORK = 'regtest' as const;
 /**
  * Default API request timeout in milliseconds
  */
-export const DEFAULT_API_TIMEOUT = 30000; // 30 seconds
+export const DEFAULT_API_TIMEOUT = 120000; // 30 seconds
 
 /**
  * Default maximum number of retries for failed requests
