@@ -1,13 +1,15 @@
-import { isNode } from './environment';
+import { isBare, isNode } from './environment';
 import { convertToArrayBuffer } from './crypto-helpers';
+import * as noble from "@noble/hashes/legacy.js";
 
 export async function sha256(data: Uint8Array | Buffer): Promise<Uint8Array> {
-  if (isNode()) {
+  if (isNode() || isBare()) {
     // String concatenation prevents bundlers from analyzing the import
     const nodeCrypto = 'node:' + 'crypto';
     const { createHash } = await import(nodeCrypto);
     return createHash('sha256').update(data as any).digest();
-  } else {
+  }
+  else {
     if (!data) {
       throw new Error('sha256: data is undefined or null');
     }
@@ -24,6 +26,8 @@ export async function ripemd160(data: Uint8Array): Promise<Uint8Array> {
     const nodeCrypto = 'node:' + 'crypto';
     const { createHash } = await import(nodeCrypto);
     return createHash('ripemd160').update(data).digest();
+  } else if (isBare()) {
+    return new Uint8Array(await noble.ripemd160(data));
   } else {
     // @ts-ignore - ripemd160 doesn't have type definitions
     const ripemd160Module = await import('ripemd160');
