@@ -9,7 +9,7 @@
  */
 
 // Export signer functions
-export { signPsbt, signPsbtSync, signPsbtFromSeed, signMessage, verifyMessage, estimatePsbt } from './signer';
+export { signPsbt, signPsbtSync, signPsbtFromSeed, signPsbtFromPrivateKey, signMessage, verifyMessage, estimatePsbt } from './signer';
 export type { SignPsbtOptions, SignMessageParams, SignMessageResult, VerifyMessageParams, EstimateFeeResult } from './signer';
 
 // Export key functions
@@ -17,6 +17,7 @@ export {
   generateKeys, 
   deriveKeysFromMnemonic, 
   deriveKeysFromSeed,
+  deriveKeysFromPrivateKey,
   restoreKeys, 
   accountXpubsFromMnemonic,
   getXprivFromMnemonic,

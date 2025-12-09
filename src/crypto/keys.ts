@@ -369,6 +369,87 @@ export async function deriveKeysFromSeed(
 }
 
 /**
+ * Derive wallet keys from a raw private key (hex string)
+ * 
+ * Creates a BIP32 root node from the private key using HMAC-SHA512, gets the xpriv,
+ * and then uses deriveKeysFromXpriv to reuse existing code.
+ * 
+ * @param bitcoinNetwork - Network string or number (default: 'regtest')
+ * @param privateKeyHex - Hexadecimal private key (64 characters, 32 bytes)
+ * @returns Promise resolving to generated keys (without mnemonic)
+ * @throws {ValidationError} If private key is invalid
+ * @throws {CryptoError} If key derivation fails
+ * 
+ * @example
+ * ```typescript
+ * const keys = await deriveKeysFromPrivateKey('regtest', '25c5b7223ef79dcfc71842e95bdee3ba12db87d80b013a440c2717faa8fe936a');
+ * console.log('Master Fingerprint:', keys.master_fingerprint);
+ * console.log('Account xpub vanilla:', keys.account_xpub_vanilla);
+ * ```
+ */
+export async function deriveKeysFromPrivateKey(
+  bitcoinNetwork: string | number = 'regtest',
+  privateKeyHex: string
+): Promise<GeneratedKeys> {
+  if (!privateKeyHex || typeof privateKeyHex !== 'string') {
+    throw new ValidationError('privateKey must be a non-empty hex string', 'privateKey');
+  }
+
+  const hex = privateKeyHex.startsWith('0x') ? privateKeyHex.slice(2) : privateKeyHex.trim();
+  
+  if (hex.length !== 64) {
+    throw new ValidationError('Private key must be 64 hex characters (32 bytes)', 'privateKey');
+  }
+
+  const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
+
+  try {
+    // Create a BIP32 seed from the private key using HMAC-SHA512
+    // This is the same process used in signPsbtFromPrivateKey
+    const { isNode, isBare } = await import('../utils/environment');
+    const privateKeyBuffer = Buffer.from(hex, 'hex');
+    const seedKey = Buffer.from('Bitcoin seed', 'utf8');
+    
+    let seed: Buffer;
+    if (isNode() || isBare()) {
+      const nodeCrypto = 'node:' + 'crypto';
+      const { createHmac } = await import(nodeCrypto);
+      seed = createHmac('sha512', seedKey).update(privateKeyBuffer).digest();
+    } else {
+      // Browser environment - use Web Crypto API
+      const keyArray = new Uint8Array(seedKey.buffer, seedKey.byteOffset, seedKey.byteLength);
+      const dataArray = new Uint8Array(privateKeyBuffer.buffer, privateKeyBuffer.byteOffset, privateKeyBuffer.byteLength);
+      
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw',
+        keyArray.buffer,
+        { name: 'HMAC', hash: 'SHA-512' },
+        false,
+        ['sign']
+      );
+      
+      const signature = await crypto.subtle.sign('HMAC', cryptoKey, dataArray.buffer);
+      seed = Buffer.from(signature);
+    }
+
+    // Create root node from seed and get xpriv, then use existing deriveKeysFromXpriv
+    const { ecc, factory } = await ensureBaseDependencies();
+    const versions = getNetworkVersions(normalizedNetwork);
+    const bip32 = factory(ecc);
+    const root = bip32.fromSeed(seed, versions);
+    const xpriv = root.toBase58();
+
+    // Reuse existing deriveKeysFromXpriv function
+    return await deriveKeysFromXpriv(normalizedNetwork, xpriv);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    throw new CryptoError('Failed to derive keys from private key', error as Error);
+  }
+}
+
+/**
  * Restore wallet keys from existing mnemonic (backward compatibility alias)
  * @deprecated Use `deriveKeysFromMnemonic()` instead. This alias will be removed in a future version.
  * @see deriveKeysFromMnemonic

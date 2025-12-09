@@ -12,7 +12,7 @@
 import type { BIP32Interface } from 'bip32';
 import type { Psbt as BitcoinJsPsbt, Network as BitcoinJsNetwork } from 'bitcoinjs-lib';
 import { ValidationError, CryptoError } from '../errors';
-import { validateMnemonic, validatePsbt, normalizeNetwork } from '../utils/validation';
+import { validateMnemonic, validatePsbt, normalizeNetwork, validateHex } from '../utils/validation';
 import {
   DERIVATION_PURPOSE,
   DERIVATION_ACCOUNT,
@@ -271,6 +271,69 @@ async function getMasterFingerprint(rootNode: BIP32Interface): Promise<string> {
   return calculateMasterFingerprint(rootNode);
 }
 
+/**
+ * Create HMAC-SHA512 hash (used to create seed from private key)
+ */
+async function hmacSha512(key: Uint8Array | Buffer, data: Uint8Array | Buffer): Promise<Uint8Array> {
+  const { isNode, isBare } = await import('../utils/environment');
+  
+  if (isNode() || isBare()) {
+    const nodeCrypto = 'node:' + 'crypto';
+    const { createHmac } = await import(nodeCrypto);
+    return createHmac('sha512', key as any).update(data as any).digest();
+  } else {
+    // Browser environment - use Web Crypto API
+    const keyArray = key instanceof Buffer ? new Uint8Array(key.buffer, key.byteOffset, key.byteLength) : key;
+    const dataArray = data instanceof Buffer ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength) : data;
+    
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyArray.buffer,
+      { name: 'HMAC', hash: 'SHA-512' },
+      false,
+      ['sign']
+    );
+    
+    const signature = await crypto.subtle.sign('HMAC', cryptoKey, dataArray.buffer);
+    return new Uint8Array(signature);
+  }
+}
+
+/**
+ * Create a BIP32 root node from a raw private key
+ * Uses HMAC-SHA512 to create a proper 64-byte seed from the 32-byte private key
+ */
+async function createRootNodeFromPrivateKey(
+  privateKeyHex: string,
+  network: Network,
+  deps: SignerDependencies
+): Promise<BIP32Interface> {
+  const { ecc, factory } = deps;
+  const bip32 = factory(ecc);
+  const versions = getNetworkVersions(network);
+
+  // Validate and convert hex private key to Buffer
+  validateHex(privateKeyHex, 'privateKey');
+  const hex = privateKeyHex.startsWith('0x') ? privateKeyHex.slice(2) : privateKeyHex;
+  
+  if (hex.length !== 64) {
+    throw new ValidationError('Private key must be 64 hex characters (32 bytes)', 'privateKey');
+  }
+
+  const privateKeyBuffer = Buffer.from(hex, 'hex');
+
+  // Create a BIP32 seed from the private key using HMAC-SHA512
+  // This follows the BIP32 standard for creating a seed from a master key
+  const seedKey = Buffer.from('Bitcoin seed', 'utf8');
+  const seed = await hmacSha512(seedKey, privateKeyBuffer);
+
+  try {
+    return bip32.fromSeed(seed, versions);
+  } catch (error) {
+    throw new CryptoError('Failed to create BIP32 root node from private key', error as Error);
+  }
+}
+
 async function signPsbtFromSeedInternal(
   seed: Buffer | Uint8Array,
   psbtBase64: string,
@@ -299,6 +362,58 @@ async function signPsbtFromSeedInternal(
 
   let wallet: BDKWallet;
   try {
+    console.log('Creating BDK wallet with descriptors:',psbtType, { external, internal });
+    wallet = bdk.Wallet.create(network as BDKNetwork, external, internal);
+  } catch (error) {
+    throw new CryptoError('Failed to create BDK wallet', error as Error);
+  }
+
+  let processedPsbt = psbtBase64.trim();
+  if (needsPreprocessing || options.preprocess) {
+    try {
+      processedPsbt = preprocessPsbtForBDK(psbtBase64, rootNode, fp, network, deps);
+    } catch (error) {
+      throw new CryptoError('Failed to preprocess PSBT', error as Error);
+    }
+  }
+
+  let pstb: BDKPsbt;
+  try {
+    pstb = bdk.Psbt.from_string(processedPsbt);
+  } catch (error) {
+    throw new CryptoError('Failed to parse PSBT', error as Error);
+  }
+
+  const signOptions = options.signOptions || new bdk.SignOptions();
+  try {
+    wallet.sign(pstb, signOptions);
+  } catch (error) {
+    throw new CryptoError('Failed to sign PSBT', error as Error);
+  }
+
+  return pstb.toString().trim();
+}
+
+async function signPsbtFromPrivateKeyInternal(
+  privateKeyHex: string,
+  psbtBase64: string,
+  network: Network,
+  options: SignPsbtOptions = {},
+  deps: SignerDependencies
+): Promise<string> {
+  validatePsbt(psbtBase64, 'psbtBase64');
+
+  const { bdk } = deps;
+  const rootNode = await createRootNodeFromPrivateKey(privateKeyHex, network, deps);
+
+  const fp = await getMasterFingerprint(rootNode);
+  const psbtType = detectPsbtType(psbtBase64, deps);
+  const needsPreprocessing = psbtType === 'send';
+  const { external, internal } = deriveDescriptors(rootNode, fp, network, psbtType);
+
+  let wallet: BDKWallet;
+  try {
+    console.log('Creating BDK wallet with descriptors:',psbtType, { external, internal });
     wallet = bdk.Wallet.create(network as BDKNetwork, external, internal);
   } catch (error) {
     throw new CryptoError('Failed to create BDK wallet', error as Error);
@@ -411,6 +526,60 @@ export async function signPsbtFromSeed(
   const normalizedNetwork = normalizeNetwork(network);
   const deps = await ensureSignerDependencies();
   return signPsbtFromSeedInternal(normalizedSeed, psbtBase64, normalizedNetwork, options, deps);
+}
+
+/**
+ * Sign a PSBT using a raw private key (hex string)
+ * 
+ * Note: This function creates a BIP32 root node from the private key using HMAC-SHA512
+ * to generate a proper seed. The private key must be 64 hex characters (32 bytes).
+ * 
+ * @param privateKeyHex - Hexadecimal private key (64 characters, e.g., '25c5b7223ef79dcfc71842e95bdee3ba12db87d80b013a440c2717faa8fe936a')
+ * @param psbtBase64 - Base64 encoded PSBT string
+ * @param network - Bitcoin network ('mainnet' | 'testnet' | 'signet' | 'regtest')
+ * @param options - Optional signing options
+ * @param options.signOptions - BDK sign options (defaults used if not provided)
+ * @param options.preprocess - Force preprocessing (auto-detected by default)
+ * @returns Base64 encoded signed PSBT
+ * @throws {ValidationError} If private key or PSBT format is invalid
+ * @throws {CryptoError} If signing fails
+ * 
+ * @example
+ * ```typescript
+ * const signedPsbt = signPsbtFromPrivateKey(
+ *   '25c5b7223ef79dcfc71842e95bdee3ba12db87d80b013a440c2717faa8fe936a',
+ *   'cHNidP8BAIkBAAAAA...',
+ *   'testnet'
+ * );
+ * ```
+ */
+export async function signPsbtFromPrivateKey(
+  privateKeyHex: string,
+  psbtBase64: string,
+  network: Network = 'testnet',
+  options: SignPsbtOptions = {}
+): Promise<string> {
+  try {
+    // Validate inputs
+    if (!privateKeyHex || typeof privateKeyHex !== 'string') {
+      throw new ValidationError('privateKey must be a non-empty hex string', 'privateKey');
+    }
+
+    const normalizedNetwork = normalizeNetwork(network);
+    const deps = await ensureSignerDependencies();
+    return await signPsbtFromPrivateKeyInternal(
+      privateKeyHex.trim(),
+      psbtBase64,
+      normalizedNetwork,
+      options,
+      deps
+    );
+  } catch (error) {
+    if (error instanceof ValidationError || error instanceof CryptoError) {
+      throw error;
+    }
+    throw new CryptoError('Unexpected error during PSBT signing', error as Error);
+  }
 }
 
 function ensureDerivationPath(path: string): string {
