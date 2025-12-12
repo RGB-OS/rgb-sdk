@@ -81,10 +81,11 @@ export class WalletManager {
   private readonly xpub: string | null;
   private readonly xpub_van: string;
   private readonly xpub_col: string;
-  private readonly mnemonic: string | null;
-  private readonly seed: Uint8Array | null;
+  private mnemonic: string | null;
+  private seed: Uint8Array | null;
   private readonly network: Network;
   private readonly masterFingerprint: string;
+  private disposed: boolean = false;
 
   constructor(params: WalletInitParams) {
     // Validate required parameters
@@ -136,6 +137,45 @@ export class WalletManager {
    */
   public getNetwork(): Network {
     return this.network;
+  }
+
+  /**
+   * Dispose of sensitive wallet data
+   * Clears mnemonic and seed from memory
+   * Idempotent - safe to call multiple times
+   */
+  public dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    if (this.mnemonic !== null) {
+      this.mnemonic = null;
+    }
+
+    if (this.seed !== null && this.seed.length > 0) {
+      this.seed.fill(0);
+      this.seed = null;
+    }
+
+    this.disposed = true;
+  }
+
+  /**
+   * Check if wallet has been disposed
+   */
+  public isDisposed(): boolean {
+    return this.disposed;
+  }
+
+  /**
+   * Guard method to ensure wallet has not been disposed
+   * @throws {WalletError} if wallet has been disposed
+   */
+  private ensureNotDisposed(): void {
+    if (this.disposed) {
+      throw new WalletError('Wallet has been disposed');
+    }
   }
 
   // ========== RGB API Methods (delegated to RGBClient) ==========
@@ -204,6 +244,7 @@ export class WalletManager {
   }
 
   public async sendBtc(params: SendBtcBeginRequestModel): Promise<string> {
+    this.ensureNotDisposed();
     const psbt = await this.sendBtcBegin(params);
     const signed = await this.signPsbt(psbt);
     return this.sendBtcEnd({ signed_psbt: signed });
@@ -285,6 +326,7 @@ export class WalletManager {
    * @param mnemonic - Optional mnemonic (uses wallet's mnemonic if not provided)
    */
   public async signPsbt(psbt: string, mnemonic?: string): Promise<string> {
+    this.ensureNotDisposed();
     const mnemonicToUse = mnemonic ?? this.mnemonic;
 
     if (mnemonicToUse) {
@@ -303,6 +345,7 @@ export class WalletManager {
    * @param mnemonic - Optional mnemonic for signing
    */
   public async send(invoiceTransfer: SendAssetBeginRequestModel, mnemonic?: string): Promise<SendResult> {
+    this.ensureNotDisposed();
     const psbt = await this.sendBegin(invoiceTransfer);
     const signed_psbt = await this.signPsbt(psbt, mnemonic);
     console.log('send signed_psbt', signed_psbt);
@@ -310,6 +353,7 @@ export class WalletManager {
   }
 
   public async createUtxos({ up_to, num, size, fee_rate }: { up_to?: boolean, num?: number, size?: number, fee_rate?: number }): Promise<number> {
+    this.ensureNotDisposed();
     const psbt = await this.createUtxosBegin({ up_to, num, size, fee_rate });
     const signed_psbt = await this.signPsbt(psbt);
     return await this.createUtxosEnd({ signed_psbt });
@@ -320,6 +364,7 @@ export class WalletManager {
   }
 
   public async signMessage(message: string): Promise<string> {
+    this.ensureNotDisposed();
     if (!message) {
       throw new ValidationError('message is required', 'message');
     }
