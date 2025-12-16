@@ -27,7 +27,12 @@ import {
   SendBtcEndRequestModel,
   GetFeeEstimationRequestModel,
   GetFeeEstimationResponse,
-  AssetNIA
+  AssetNIA,
+  IssueAssetIfaRequestModel,
+  AssetIfa,
+  InflateAssetIfaRequestModel,
+  InflateEndRequestModel,
+  OperationResult
 } from "../types/rgb-model";
 
 /**
@@ -153,6 +158,18 @@ export class RGBClient {
 
   async issueAssetNia(params: { ticker: string; name: string; amounts: number[]; precision: number }): Promise<AssetNIA> {
     return this.request<AssetNIA>("post", "/wallet/issueassetnia", params);
+  }
+
+  async issueAssetIfa(params: IssueAssetIfaRequestModel): Promise<AssetIfa> {
+    return this.request<AssetIfa>("post", "/wallet/issueassetifa", params);
+  }
+
+  async inflateBegin(params: InflateAssetIfaRequestModel): Promise<string> {
+    return this.request<string>("post", "/wallet/inflatebegin", params);
+  }
+
+  async inflateEnd(params: InflateEndRequestModel): Promise<OperationResult> {
+    return this.request<OperationResult>("post", "/wallet/inflateend", params);
   }
 
   async listAssets(): Promise<ListAssetsResponse> {

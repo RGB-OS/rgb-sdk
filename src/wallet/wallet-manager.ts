@@ -22,7 +22,12 @@ import {
   SendBtcBeginRequestModel,
   SendBtcEndRequestModel,
   GetFeeEstimationResponse,
-  AssetNIA
+  AssetNIA,
+  IssueAssetIfaRequestModel,
+  AssetIfa,
+  InflateAssetIfaRequestModel,
+  InflateEndRequestModel,
+  OperationResult
 } from '../types/rgb-model';
 import { signPsbt, signPsbtFromSeed, signMessage as signSchnorrMessage, verifyMessage as verifySchnorrMessage, estimatePsbt } from '../crypto';
 import type { EstimateFeeResult, Network } from '../crypto';
@@ -260,6 +265,32 @@ export class WalletManager {
 
   public async issueAssetNia(params: IssueAssetNiaRequestModel): Promise<AssetNIA> {
     return this.client.issueAssetNia(params);
+  }
+
+  public async issueAssetIfa(params: IssueAssetIfaRequestModel): Promise<AssetIfa> {
+    return this.client.issueAssetIfa(params);
+  }
+
+  public async inflateBegin(params: InflateAssetIfaRequestModel): Promise<string> {
+    return this.client.inflateBegin(params);
+  }
+
+  public async inflateEnd(params: InflateEndRequestModel): Promise<OperationResult> {
+    return this.client.inflateEnd(params);
+  }
+
+  /**
+   * Complete inflate operation: begin → sign → end
+   * @param params - Inflate parameters
+   * @param mnemonic - Optional mnemonic for signing
+   */
+  public async inflate(params: InflateAssetIfaRequestModel, mnemonic?: string): Promise<OperationResult> {
+    this.ensureNotDisposed();
+    const psbt = await this.inflateBegin(params);
+    const signed_psbt = await this.signPsbt(psbt, mnemonic);
+    return await this.inflateEnd({
+      signed_psbt
+    });
   }
 
   public async refreshWallet(): Promise<void> {

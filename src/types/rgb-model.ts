@@ -46,6 +46,16 @@ export interface Recipient {
   transport_endpoints: string[];
 }
 export interface IssueAssetNiaRequestModel { ticker: string; name: string; amounts: number[]; precision: number }
+
+export interface IssueAssetIfaRequestModel {
+  ticker: string;
+  name: string;
+  precision: number;
+  amounts: number[];
+  inflation_amounts: number[];
+  replace_rights_num: number;
+  reject_list_url?: string;
+}
 export interface SendAssetBeginRequestModel {
   invoice: string;
   witness_data?: WitnessData;
@@ -66,6 +76,11 @@ export interface SendResult {
   batch_transfer_idx: number;
 }
 
+export interface OperationResult {
+  txid: string;
+  batch_transfer_idx: number;
+}
+
 export interface CreateUtxosBeginRequestModel {
   up_to?: boolean;
   num?: number;
@@ -74,6 +89,17 @@ export interface CreateUtxosBeginRequestModel {
 }
 
 export interface CreateUtxosEndRequestModel {
+  signed_psbt: string;
+}
+
+export interface InflateAssetIfaRequestModel {
+  asset_id: string;
+  inflation_amounts: number[];
+  fee_rate?: number;
+  min_confirmations?: number;
+}
+
+export interface InflateEndRequestModel {
   signed_psbt: string;
 }
 
@@ -160,7 +186,7 @@ export interface RgbAllocation {
   settled: boolean;
 }
 
-interface Balance {
+export interface Balance {
   settled: number
   future: number,
   spendable: number
@@ -251,6 +277,22 @@ export interface AssetNIA {
    * @memberof AssetNIA
    */
   media?: Media;
+}
+
+export interface AssetIfa {
+  asset_id: string;
+  ticker: string;
+  name: string;
+  details?: string;
+  precision: number;
+  initial_supply: number;
+  max_supply: number;
+  known_circulating_supply: number;
+  timestamp: number;
+  added_at: number;
+  balance: Balance;
+  media?: Media;
+  reject_list_url?: string;
 }
 
 export interface Media {
