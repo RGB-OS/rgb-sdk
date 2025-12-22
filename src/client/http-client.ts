@@ -1,6 +1,6 @@
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from "axios";
 import { RGBHTTPClientParams } from "../types/rgb-model";
-import { NetworkError } from "../errors";
+import { NetworkError, BadRequestError, NotFoundError, ConflictError, RgbNodeError, SDKError } from "../errors";
 import { logger } from "../utils/logger";
 import { validateRequired, validateString } from "../utils/validation";
 import { DEFAULT_API_TIMEOUT } from "../constants";
@@ -42,6 +42,44 @@ export const createClient = (params: RGBHTTPClientParams): AxiosInstance => {
     }
   );
 
+  /**
+   * Extract error message from API response
+   */
+  const extractErrorMessage = (status: number, data: any, defaultMessage: string): string => {
+    if (typeof data === 'string') {
+      return data;
+    }
+    if (data && typeof data === 'object') {
+      // Try common error message fields
+      if (data.detail) return String(data.detail);
+      if (data.message) return String(data.message);
+      if (data.error) return String(data.error);
+    }
+    return defaultMessage;
+  };
+
+  /**
+   * Map HTTP status code to specific error class
+   */
+  const createHttpError = (status: number, message: string, cause: AxiosError): SDKError => {
+    switch (status) {
+      case 400:
+        return new BadRequestError(message, cause);
+      case 404:
+        return new NotFoundError(message, cause);
+      case 409:
+        return new ConflictError(message, cause);
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        return new RgbNodeError(message, status, cause);
+      default:
+        // For other status codes, use NetworkError with status code
+        return new NetworkError(message, status, cause);
+    }
+  };
+
   // Response interceptor
   client.interceptors.response.use(
     (response) => {
@@ -57,20 +95,17 @@ export const createClient = (params: RGBHTTPClientParams): AxiosInstance => {
         const status = error.response.status;
         const data = error.response.data;
         const url = error.config?.url;
+        const defaultMessage = `API request failed: ${status} ${error.response.statusText || 'Unknown error'}`;
+        const message = extractErrorMessage(status, data, defaultMessage);
         
         logger.error('API Error:', {
           status,
           url,
           data,
+          message,
         });
 
-        return Promise.reject(
-          new NetworkError(
-            `API request failed: ${status} ${error.response.statusText}`,
-            status,
-            error
-          )
-        );
+        return Promise.reject(createHttpError(status, message, error));
       } else if (error.request) {
         // Request was made but no response received
         logger.error('Network error - no response:', {
