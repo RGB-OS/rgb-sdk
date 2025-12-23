@@ -32,7 +32,8 @@ import {
   AssetIfa,
   InflateAssetIfaRequestModel,
   InflateEndRequestModel,
-  OperationResult
+  OperationResult,
+  DecodeRgbInvoiceResponse
 } from "../types/rgb-model";
 
 /**
@@ -176,8 +177,8 @@ export class RGBClient {
     return this.request<ListAssetsResponse>("post", "/wallet/listassets");
   }
 
-  async decodeRGBInvoice(params: { invoice: string }): Promise<SendAssetBeginRequestModel> {
-    return this.request<SendAssetBeginRequestModel>("post", "/wallet/decodergbinvoice", params);
+  async decodeRGBInvoice(params: { invoice: string }): Promise<DecodeRgbInvoiceResponse> {
+    return this.request<DecodeRgbInvoiceResponse>("post", "/wallet/decodergbinvoice", params);
   }
 
   async refreshWallet(): Promise<void> {

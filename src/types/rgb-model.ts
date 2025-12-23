@@ -140,7 +140,13 @@ export interface Transaction {
   fee: number;
   confirmation_time?: BlockTime;
 }
-
+enum TransferKind {
+    ISSUANCE = 0,
+    RECEIVE_BLIND = 1,
+    RECEIVE_WITNESS = 2,
+    SEND = 3,
+    INFLATION = 4
+  }
 export interface RgbTransfer {
   idx: number;
   batch_transfer_idx: number;
@@ -148,7 +154,7 @@ export interface RgbTransfer {
   updated_at: number;
   status: TransferStatus;
   amount: number;
-  kind: number;
+  kind: TransferKind;
   txid: string | null;
   recipient_id: string;
   receive_utxo: { txid: string; vout: number };
@@ -405,10 +411,15 @@ export interface AssetBalanceResponse {
 
 export interface DecodeRgbInvoiceResponse {
   recipient_id: string;
-  asset_iface?: string;
+  asset_schema?: string;
   asset_id?: string;
-  amount?: string;
   network: string;
-  expiration_timestamp: number;
+  assignment: Assignment;
+  assignment_name?: string;
+  expiration_timestamp?: number;
   transport_endpoints: string[];
+}
+
+export interface Assignment {
+  [key: string]: any;
 }

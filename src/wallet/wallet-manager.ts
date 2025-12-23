@@ -27,7 +27,8 @@ import {
   AssetIfa,
   InflateAssetIfaRequestModel,
   InflateEndRequestModel,
-  OperationResult
+  OperationResult,
+  DecodeRgbInvoiceResponse
 } from '../types/rgb-model';
 import { signPsbt, signPsbtFromSeed, signMessage as signSchnorrMessage, verifyMessage as verifySchnorrMessage, estimatePsbt } from '../crypto';
 import type { EstimateFeeResult, Network } from '../crypto';
@@ -309,7 +310,7 @@ export class WalletManager {
     return this.client.failTransfers(params);
   }
 
-  public async decodeRGBInvoice(params: { invoice: string }): Promise<SendAssetBeginRequestModel> {
+  public async decodeRGBInvoice(params: { invoice: string }): Promise<DecodeRgbInvoiceResponse> {
     return this.client.decodeRGBInvoice(params);
   }
 
