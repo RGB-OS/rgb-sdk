@@ -33,7 +33,16 @@ import {
   InflateAssetIfaRequestModel,
   InflateEndRequestModel,
   OperationResult,
-  DecodeRgbInvoiceResponse
+  DecodeRgbInvoiceResponse,
+  SingleUseDepositAddressResponse,
+  WalletBalanceResponse,
+  CreateLightningInvoiceRequestModel,
+  LightningReceiveRequest,
+  LightningSendRequest,
+  GetLightningSendFeeEstimateRequestModel,
+  PayLightningInvoiceRequestModel,
+  WithdrawFromUTEXORequestModel,
+  WithdrawFromUTEXOResponse
 } from "../types/rgb-model";
 
 /**
@@ -256,5 +265,116 @@ export class RGBClient {
       headers: form.getHeaders()
     });
     return response.data;
+  }
+
+  // ==========================================
+  // Deposit & UTEXO API
+  // ==========================================
+
+  async getSingleUseDepositAddress(): Promise<SingleUseDepositAddressResponse> {
+    return this.request<SingleUseDepositAddressResponse>("get", "/wallet/single-use-address");
+  }
+
+  async getBalance(): Promise<WalletBalanceResponse> {
+    return this.request<WalletBalanceResponse>("get", "/wallet/balance");
+  }
+
+  async settle(): Promise<Record<string, any>> {
+    return this.request<Record<string, any>>("post", "/wallet/settle");
+  }
+
+  // ==========================================
+  // Lightning API
+  // ==========================================
+
+  /**
+   * Creates a Lightning invoice for receiving BTC or asset payments.
+   *
+   * @param params - Request parameters for creating the Lightning invoice
+   * @returns {Promise<LightningReceiveRequest>} Lightning invoice response
+   */
+  async createLightningInvoice(params: CreateLightningInvoiceRequestModel): Promise<LightningReceiveRequest> {
+    return this.request<LightningReceiveRequest>("post", "/lightning/create-invoice", params);
+  }
+
+  /**
+   * Returns the status of a Lightning invoice created with createLightningInvoice.
+   * Supports both BTC and asset invoices.
+   *
+   * @param id - The request ID of the Lightning invoice
+   * @returns {Promise<LightningReceiveRequest | null>} Lightning invoice response or null if not found
+   */
+  async getLightningReceiveRequest(id: string): Promise<LightningReceiveRequest | null> {
+    return this.request<LightningReceiveRequest | null>("get", `/lightning/receive-request/${id}`);
+  }
+
+  /**
+   * Returns the current status of a Lightning payment initiated with payLightningInvoice.
+   * Works for both BTC and asset payments.
+   *
+   * @param id - The request ID of the Lightning send request
+   * @returns {Promise<LightningSendRequest | null>} Lightning send request response or null if not found
+   */
+  async getLightningSendRequest(id: string): Promise<LightningSendRequest | null> {
+    return this.request<LightningSendRequest | null>("get", `/lightning/send-request/${id}`);
+  }
+
+  /**
+   * Estimates the routing fee required to pay a Lightning invoice.
+   * For asset payments, the returned fee is always denominated in satoshis.
+   *
+   * @param params - Request parameters containing the invoice and optional asset
+   * @returns {Promise<number>} Estimated fee in satoshis
+   */
+  async getLightningSendFeeEstimate(params: GetLightningSendFeeEstimateRequestModel): Promise<number> {
+    return this.request<number>("post", "/lightning/fee-estimate", params);
+  }
+
+  /**
+   * Begins a Lightning invoice payment process.
+   * Returns the invoice string as a mock PSBT (later will be constructed base64 PSBT).
+   *
+   * @param params - Request parameters containing the invoice and max fee
+   * @returns {Promise<string>} PSBT string (currently returns invoice, later will be base64 PSBT)
+   */
+  async payLightningInvoiceBegin(params: PayLightningInvoiceRequestModel): Promise<string> {
+    return this.request<string>("post", "/lightning/pay-invoice-begin", params);
+  }
+
+  /**
+   * Completes a Lightning invoice payment using signed PSBT.
+   * Works the same as pay-invoice but uses signed_psbt instead of invoice.
+   *
+   * @param params - Request parameters containing the signed PSBT
+   * @returns {Promise<LightningSendRequest>} Lightning send request response
+   */
+  async payLightningInvoiceEnd(params: SendAssetEndRequestModel): Promise<LightningSendRequest> {
+    return this.request<LightningSendRequest>("post", "/lightning/pay-invoice-end", params);
+  }
+
+  // ==========================================
+  // Withdrawal API
+  // ==========================================
+
+  /**
+   * Begins a withdrawal process from UTEXO.
+   * Returns the request encoded as base64 (mock PSBT).
+   * Later this should construct and return a real base64 PSBT.
+   *
+   * @param params - Request parameters for withdrawal
+   * @returns {Promise<string>} PSBT string (currently returns encoded request, later will be base64 PSBT)
+   */
+  async withdrawBegin(params: WithdrawFromUTEXORequestModel): Promise<string> {
+    return this.request<string>("post", "/wallet/withdraw-begin", params);
+  }
+
+  /**
+   * Completes a withdrawal from UTEXO using signed PSBT.
+   *
+   * @param params - Request parameters containing the signed PSBT
+   * @returns {Promise<WithdrawFromUTEXOResponse>} Withdrawal response
+   */
+  async withdrawEnd(params: SendAssetEndRequestModel): Promise<WithdrawFromUTEXOResponse> {
+    return this.request<WithdrawFromUTEXOResponse>("post", "/wallet/withdraw-end", params);
   }
 }

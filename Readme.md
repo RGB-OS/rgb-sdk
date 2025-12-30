@@ -50,6 +50,19 @@ With this SDK, developers can:
 | `createBackup(password)` | Create an encrypted wallet backup on the RGB node |
 | `downloadBackup(backupId?)` | Download the generated backup binary |
 | `restoreFromBackup({ backup, password, ... })` | Restore wallet state from a backup file |
+| `getSingleUseDepositAddress()` | Get a single-use deposit address for receiving assets |
+| `getBalance()` | Get wallet balance including BTC and asset balances |
+| `settle()` | Settle balances in the wallet |
+| `createLightningInvoice({ amount_sats, asset, ... })` | Create a Lightning invoice for receiving BTC or asset payments |
+| `getLightningReceiveRequest(id)` | Get the status of a Lightning invoice by request ID |
+| `getLightningSendRequest(id)` | Get the status of a Lightning payment by request ID |
+| `getLightningSendFeeEstimate({ invoice, asset? })` | Estimate the routing fee required to pay a Lightning invoice |
+| `payLightningInvoiceBegin({ invoice, max_fee_sats })` | Begin a Lightning invoice payment process |
+| `payLightningInvoiceEnd({ signed_psbt })` | Complete a Lightning invoice payment using signed PSBT |
+| `payLightningInvoice({ invoice, max_fee_sats }, mnemonic?)` | Pay a Lightning invoice (begin + sign + end) |
+| `withdrawBegin({ address_or_rgbinvoice, amount_sats, fee_rate, asset? })` | Begin a withdrawal process from UTEXO |
+| `withdrawEnd({ signed_psbt })` | Complete a withdrawal from UTEXO using signed PSBT |
+| `withdraw({ address_or_rgbinvoice, amount_sats, fee_rate, asset? }, mnemonic?)` | Withdraw BTC or assets from UTEXO to Bitcoin L1 (begin + sign + end) |
 
 ---
 
@@ -347,6 +360,20 @@ const transactions = await wallet.listTransactions();
 
 // List transfers for specific asset
 const transfers = await wallet.listTransfers(asset_id);
+
+// Get single-use deposit address
+const depositAddress = await wallet.getSingleUseDepositAddress();
+console.log('BTC Address:', depositAddress.btc_address);
+console.log('Asset Invoice:', depositAddress.asset_invoice);
+
+// Get comprehensive wallet balance
+const walletBalance = await wallet.getBalance();
+console.log('BTC Balance:', walletBalance.balance);
+console.log('Asset Balances:', walletBalance.asset_balances);
+
+// Settle wallet balances
+const settlementResult = await wallet.settle();
+console.log('Settlement result:', settlementResult);
 ```
 
 ---
@@ -401,6 +428,147 @@ async function demo() {
 
     // Wallet is ready to send/receive RGB assets
 }
+```
+
+---
+
+## Lightning API
+
+### Create Lightning Invoice
+
+Create Lightning invoices for receiving BTC or asset payments over the Lightning Network.
+
+```javascript
+// Create Lightning invoice for BTC payment
+const btcInvoice = await wallet.createLightningInvoice({
+    amount_sats: 10000,  // 10,000 satoshis
+    expiry_seconds: 3600  // Optional: invoice expires in 1 hour (default if not specified)
+});
+
+console.log('Invoice ID:', btcInvoice.id);
+console.log('Lightning Invoice:', btcInvoice.invoice);
+console.log('Status:', btcInvoice.status); // 'OPEN', 'SETTLED', 'EXPIRED', or 'FAILED'
+console.log('Payment Type:', btcInvoice.payment_type); // 'BTC' or 'ASSET'
+console.log('Amount (sats):', btcInvoice.amount_sats);
+console.log('Created At:', btcInvoice.created_at);
+
+// Create Lightning invoice for asset payment
+const assetInvoice = await wallet.createLightningInvoice({
+    asset: {
+        asset_id: 'rgb:1234567890abcdef...',  // Your asset ID
+        amount: 100  // Amount in asset units
+    },
+    expiry_seconds: 7200  // Optional: invoice expires in 2 hours
+});
+
+console.log('Asset Invoice:', assetInvoice.invoice);
+console.log('Asset Details:', assetInvoice.asset); // { asset_id, amount }
+console.log('Payment Type:', assetInvoice.payment_type); // Will be 'ASSET' when asset is provided
+
+// Check invoice status by request ID
+const invoiceStatus = await wallet.getLightningReceiveRequest(btcInvoice.id);
+if (invoiceStatus) {
+    console.log('Invoice Status:', invoiceStatus.status); // 'OPEN', 'SETTLED', 'EXPIRED', or 'FAILED'
+    console.log('Invoice:', invoiceStatus.invoice);
+} else {
+    console.log('Invoice not found');
+}
+
+// Poll for invoice status (or use webhooks)
+// Status will change from 'OPEN' to 'SETTLED' when payment is received
+
+// Check Lightning payment status
+const sendRequestId = 'your-send-request-id'; // From payLightningInvoice response
+const sendStatus = await wallet.getLightningSendRequest(sendRequestId);
+if (sendStatus) {
+    console.log('Payment Status:', sendStatus.status); // 'PENDING', 'SUCCEEDED', or 'FAILED'
+    console.log('Payment Type:', sendStatus.payment_type); // 'BTC' or 'ASSET'
+    console.log('Amount (sats):', sendStatus.amount_sats);
+    console.log('Fee (sats):', sendStatus.fee_sats);
+    if (sendStatus.asset) {
+        console.log('Asset Details:', sendStatus.asset);
+    }
+} else {
+    console.log('Send request not found');
+}
+
+// Estimate Lightning payment fee
+const invoice = 'lnbc1234567890...'; // Lightning invoice to pay
+const feeEstimate = await wallet.getLightningSendFeeEstimate({
+    invoice: invoice
+});
+console.log('Estimated fee (sats):', feeEstimate);
+
+// Estimate fee for asset payment
+const assetFeeEstimate = await wallet.getLightningSendFeeEstimate({
+    invoice: invoice,
+    asset: {
+        asset_id: 'rgb:1234567890abcdef...',
+        amount: 100
+    }
+});
+// Note: Fee is always returned in satoshis, even for asset payments
+console.log('Estimated fee for asset payment (sats):', assetFeeEstimate);
+
+// Pay a Lightning invoice (convenience method - begin + sign + end)
+const sendRequest = await wallet.payLightningInvoice({
+    invoice: invoice,
+    max_fee_sats: 1000  // Maximum fee you're willing to pay
+});
+console.log('Payment Request ID:', sendRequest.id);
+console.log('Payment Status:', sendRequest.status); // 'PENDING', 'SUCCEEDED', or 'FAILED'
+console.log('Fee Paid (sats):', sendRequest.fee_sats);
+
+// Alternative: Manual payment flow (begin + sign + end)
+const psbt = await wallet.payLightningInvoiceBegin({
+    invoice: invoice,
+    max_fee_sats: 1000
+});
+const signed_psbt = await wallet.signPsbt(psbt);
+const sendResult = await wallet.payLightningInvoiceEnd({ signed_psbt });
+console.log('Payment completed:', sendResult.id);
+```
+
+---
+
+## Withdrawal API
+
+### Withdraw from UTEXO
+
+Withdraws BTC or assets from the UTEXO layer back to Bitcoin L1. This operation creates a Bitcoin transaction that releases funds from UTEXO to a specified on-chain address.
+
+```javascript
+// Withdraw BTC from UTEXO to Bitcoin L1
+const withdrawal = await wallet.withdraw({
+    address_or_rgbinvoice: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',  // Bitcoin address
+    amount_sats: 100000,  // Amount in satoshis
+    fee_rate: 1  // Fee rate
+});
+
+console.log('Withdrawal ID:', withdrawal.withdrawal_id);
+console.log('Transaction ID:', withdrawal.txid);
+
+// Withdraw asset from UTEXO
+const assetWithdrawal = await wallet.withdraw({
+    address_or_rgbinvoice: 'rgb:1234567890abcdef...',  // RGB invoice or address
+    fee_rate: 1,
+    asset: {
+        asset_id: 'rgb:1234567890abcdef...',
+        amount: 100  // Amount in asset units
+    }
+});
+
+console.log('Asset Withdrawal ID:', assetWithdrawal.withdrawal_id);
+
+// Alternative: Manual withdrawal flow (begin + sign + end)
+const withdrawPsbt = await wallet.withdrawBegin({
+    address_or_rgbinvoice: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+    amount_sats: 100000,
+    fee_rate: 1
+});
+const signedWithdrawPsbt = await wallet.signPsbt(withdrawPsbt);
+const withdrawResult = await wallet.withdrawEnd({ signed_psbt: signedWithdrawPsbt });
+console.log('Withdrawal completed:', withdrawResult.withdrawal_id);
 ```
 
 ---

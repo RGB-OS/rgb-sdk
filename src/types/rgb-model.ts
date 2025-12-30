@@ -423,3 +423,417 @@ export interface DecodeRgbInvoiceResponse {
 export interface Assignment {
   [key: string]: any;
 }
+
+/**
+ * Response model for single-use deposit address.
+ *
+ * @export
+ * @interface SingleUseDepositAddressResponse
+ */
+export interface SingleUseDepositAddressResponse {
+  /**
+   * @type {string}
+   * @memberof SingleUseDepositAddressResponse
+   */
+  btc_address: string;
+
+  /**
+   * @type {string}
+   * @memberof SingleUseDepositAddressResponse
+   */
+  asset_invoice: string;
+
+  /**
+   * @type {string}
+   * @memberof SingleUseDepositAddressResponse
+   */
+  expires_at?: string;
+}
+
+/**
+ * Model for offchain balance detail.
+ *
+ * @export
+ * @interface OffchainBalanceDetail
+ */
+export interface OffchainBalanceDetail {
+  /**
+   * @type {string}
+   * @memberof OffchainBalanceDetail
+   */
+  expiry_time: string;
+
+  /**
+   * @type {number}
+   * @memberof OffchainBalanceDetail
+   */
+  amount: number;
+}
+
+/**
+ * Model for offchain balance.
+ *
+ * @export
+ * @interface OffchainBalance
+ */
+export interface OffchainBalance {
+  /**
+   * @type {number}
+   * @memberof OffchainBalance
+   */
+  total: number;
+
+  /**
+   * @type {Array<OffchainBalanceDetail>}
+   * @memberof OffchainBalance
+   */
+  details: OffchainBalanceDetail[];
+}
+
+/**
+ * Response model for BTC balance.
+ *
+ * @export
+ * @interface BtcBalanceResponse
+ */
+export interface BtcBalanceResponse {
+  /**
+   * @type {Balance}
+   * @memberof BtcBalanceResponse
+   */
+  vanilla: Balance;
+
+  /**
+   * @type {Balance}
+   * @memberof BtcBalanceResponse
+   */
+  colored: Balance;
+
+  /**
+   * @type {OffchainBalance}
+   * @memberof BtcBalanceResponse
+   */
+  offchain_balance?: OffchainBalance;
+}
+
+/**
+ * Model for asset balance details.
+ *
+ * @export
+ * @interface AssetBalanceDetails
+ */
+export interface AssetBalanceDetails {
+  /**
+   * @type {number}
+   * @memberof AssetBalanceDetails
+   */
+  settled: number;
+
+  /**
+   * @type {number}
+   * @memberof AssetBalanceDetails
+   */
+  future: number;
+
+  /**
+   * @type {number}
+   * @memberof AssetBalanceDetails
+   */
+  spendable: number;
+
+  /**
+   * @type {number}
+   * @memberof AssetBalanceDetails
+   */
+  offchain_outbound?: number;
+}
+
+/**
+ * Model for asset balance.
+ *
+ * @export
+ * @interface AssetBalance
+ */
+export interface AssetBalance {
+  /**
+   * @type {string}
+   * @memberof AssetBalance
+   */
+  asset_id: string;
+
+  /**
+   * @type {string}
+   * @memberof AssetBalance
+   */
+  ticker?: string;
+
+  /**
+   * @type {number}
+   * @memberof AssetBalance
+   */
+  precision: number;
+
+  /**
+   * @type {AssetBalanceDetails}
+   * @memberof AssetBalance
+   */
+  balance: AssetBalanceDetails;
+}
+
+/**
+ * Response model for wallet balance.
+ *
+ * @export
+ * @interface WalletBalanceResponse
+ */
+export interface WalletBalanceResponse {
+  /**
+   * @type {BtcBalanceResponse}
+   * @memberof WalletBalanceResponse
+   */
+  balance: BtcBalanceResponse;
+
+  /**
+   * @type {Array<AssetBalance>}
+   * @memberof WalletBalanceResponse
+   */
+  asset_balances: AssetBalance[];
+}
+
+/**
+ * Model for Lightning asset payment details.
+ *
+ * @export
+ * @interface LightningAsset
+ */
+export interface LightningAsset {
+  /**
+   * @type {string}
+   * @memberof LightningAsset
+   */
+  asset_id: string;
+
+  /**
+   * @type {number}
+   * @memberof LightningAsset
+   */
+  amount: number;
+}
+
+/**
+ * Response model for Lightning receive request.
+ *
+ * @export
+ * @interface LightningReceiveRequest
+ */
+export interface LightningReceiveRequest {
+  /**
+   * @type {string}
+   * @memberof LightningReceiveRequest
+   */
+  id: string;
+
+  /**
+   * @type {string}
+   * @memberof LightningReceiveRequest
+   */
+  invoice: string;
+
+  /**
+   * @type {'OPEN' | 'SETTLED' | 'EXPIRED' | 'FAILED'}
+   * @memberof LightningReceiveRequest
+   */
+  status: 'OPEN' | 'SETTLED' | 'EXPIRED' | 'FAILED';
+
+  /**
+   * @type {'BTC' | 'ASSET'}
+   * @memberof LightningReceiveRequest
+   */
+  payment_type: 'BTC' | 'ASSET';
+
+  /**
+   * @type {number}
+   * @memberof LightningReceiveRequest
+   */
+  amount_sats?: number;
+
+  /**
+   * @type {LightningAsset}
+   * @memberof LightningReceiveRequest
+   */
+  asset?: LightningAsset;
+
+  /**
+   * @type {string}
+   * @memberof LightningReceiveRequest
+   */
+  created_at: string;
+}
+
+/**
+ * Response model for Lightning send request.
+ *
+ * @export
+ * @interface LightningSendRequest
+ */
+export interface LightningSendRequest {
+  /**
+   * @type {string}
+   * @memberof LightningSendRequest
+   */
+  id: string;
+
+  /**
+   * @type {'PENDING' | 'SUCCEEDED' | 'FAILED'}
+   * @memberof LightningSendRequest
+   */
+  status: 'PENDING' | 'SUCCEEDED' | 'FAILED';
+
+  /**
+   * @type {'BTC' | 'ASSET'}
+   * @memberof LightningSendRequest
+   */
+  payment_type: 'BTC' | 'ASSET';
+
+  /**
+   * @type {number}
+   * @memberof LightningSendRequest
+   */
+  amount_sats?: number;
+
+  /**
+   * @type {LightningAsset}
+   * @memberof LightningSendRequest
+   */
+  asset?: LightningAsset;
+
+  /**
+   * @type {number}
+   * @memberof LightningSendRequest
+   */
+  fee_sats?: number;
+
+  /**
+   * @type {string}
+   * @memberof LightningSendRequest
+   */
+  created_at: string;
+}
+
+/**
+ * Request model for creating Lightning invoice.
+ *
+ * @export
+ * @interface CreateLightningInvoiceRequestModel
+ */
+export interface CreateLightningInvoiceRequestModel {
+  /**
+   * @type {number}
+   * @memberof CreateLightningInvoiceRequestModel
+   */
+  amount_sats?: number;
+
+  /**
+   * @type {LightningAsset}
+   * @memberof CreateLightningInvoiceRequestModel
+   */
+  asset?: LightningAsset;
+
+  /**
+   * @type {number}
+   * @memberof CreateLightningInvoiceRequestModel
+   */
+  expiry_seconds?: number;
+}
+
+/**
+ * Request model for Lightning fee estimate.
+ *
+ * @export
+ * @interface GetLightningSendFeeEstimateRequestModel
+ */
+export interface GetLightningSendFeeEstimateRequestModel {
+  /**
+   * @type {string}
+   * @memberof GetLightningSendFeeEstimateRequestModel
+   */
+  invoice: string;
+
+  /**
+   * @type {LightningAsset}
+   * @memberof GetLightningSendFeeEstimateRequestModel
+   */
+  asset?: LightningAsset;
+}
+
+/**
+ * Request model for paying a Lightning invoice.
+ *
+ * @export
+ * @interface PayLightningInvoiceRequestModel
+ */
+export interface PayLightningInvoiceRequestModel {
+  /**
+   * @type {string}
+   * @memberof PayLightningInvoiceRequestModel
+   */
+  invoice: string;
+
+  /**
+   * @type {number}
+   * @memberof PayLightningInvoiceRequestModel
+   */
+  max_fee_sats: number;
+}
+
+/**
+ * Request model for withdrawing from UTEXO.
+ *
+ * @export
+ * @interface WithdrawFromUTEXORequestModel
+ */
+export interface WithdrawFromUTEXORequestModel {
+  /**
+   * @type {string}
+   * @memberof WithdrawFromUTEXORequestModel
+   */
+  address_or_rgbinvoice: string;
+
+  /**
+   * @type {number}
+   * @memberof WithdrawFromUTEXORequestModel
+   */
+  amount_sats?: number;
+
+  /**
+   * @type {number}
+   * @memberof WithdrawFromUTEXORequestModel
+   */
+  fee_rate: number;
+
+  /**
+   * @type {LightningAsset}
+   * @memberof WithdrawFromUTEXORequestModel
+   */
+  asset?: LightningAsset;
+}
+
+/**
+ * Response model for UTEXO withdrawal.
+ *
+ * @export
+ * @interface WithdrawFromUTEXOResponse
+ */
+export interface WithdrawFromUTEXOResponse {
+  /**
+   * @type {string}
+   * @memberof WithdrawFromUTEXOResponse
+   */
+  withdrawal_id: string;
+
+  /**
+   * @type {string}
+   * @memberof WithdrawFromUTEXOResponse
+   */
+  txid?: string;
+}

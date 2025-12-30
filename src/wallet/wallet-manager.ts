@@ -28,7 +28,16 @@ import {
   InflateAssetIfaRequestModel,
   InflateEndRequestModel,
   OperationResult,
-  DecodeRgbInvoiceResponse
+  DecodeRgbInvoiceResponse,
+  SingleUseDepositAddressResponse,
+  WalletBalanceResponse,
+  CreateLightningInvoiceRequestModel,
+  LightningReceiveRequest,
+  LightningSendRequest,
+  GetLightningSendFeeEstimateRequestModel,
+  PayLightningInvoiceRequestModel,
+  WithdrawFromUTEXORequestModel,
+  WithdrawFromUTEXOResponse
 } from '../types/rgb-model';
 import { signPsbt, signPsbtFromSeed, signMessage as signSchnorrMessage, verifyMessage as verifySchnorrMessage, estimatePsbt } from '../crypto';
 import type { EstimateFeeResult, Network } from '../crypto';
@@ -426,6 +435,188 @@ export class WalletManager {
       accountXpub: this.xpub_van,
       network: this.network,
     });
+  }
+
+  // ==========================================
+  // Deposit & UTEXO API
+  // ==========================================
+
+  /**
+   * Get a single-use deposit address for receiving assets.
+   * Returns a BTC address and asset invoice that can be used once for deposits.
+   *
+   * @returns {Promise<SingleUseDepositAddressResponse>} Response containing btc_address, asset_invoice, and optional expires_at
+   * @memberof WalletManager
+   */
+  public async getSingleUseDepositAddress(): Promise<SingleUseDepositAddressResponse> {
+    return this.client.getSingleUseDepositAddress();
+  }
+
+  /**
+   * Get wallet balance including BTC balance and asset balances.
+   *
+   * @returns {Promise<WalletBalanceResponse>} Response containing BTC balance and asset balances
+   * @memberof WalletManager
+   */
+  public async getBalance(): Promise<WalletBalanceResponse> {
+    return this.client.getBalance();
+  }
+
+  /**
+   * Settle balances in the wallet.
+   *
+   * @returns {Promise<Record<string, any>>} Settlement result
+   * @memberof WalletManager
+   */
+  public async settle(): Promise<Record<string, any>> {
+    return this.client.settle();
+  }
+
+  // ==========================================
+  // Lightning API
+  // ==========================================
+
+  /**
+   * Creates a Lightning invoice for receiving BTC or asset payments.
+   *
+   * @param params - Request parameters for creating the Lightning invoice
+   * @returns {Promise<LightningReceiveRequest>} Lightning invoice response
+   * @memberof WalletManager
+   */
+  public async createLightningInvoice(params: CreateLightningInvoiceRequestModel): Promise<LightningReceiveRequest> {
+    return this.client.createLightningInvoice(params);
+  }
+
+  /**
+   * Returns the status of a Lightning invoice created with createLightningInvoice.
+   * Supports both BTC and asset invoices.
+   *
+   * @param id - The request ID of the Lightning invoice
+   * @returns {Promise<LightningReceiveRequest | null>} Lightning invoice response or null if not found
+   * @memberof WalletManager
+   */
+  public async getLightningReceiveRequest(id: string): Promise<LightningReceiveRequest | null> {
+    return this.client.getLightningReceiveRequest(id);
+  }
+
+  /**
+   * Returns the current status of a Lightning payment initiated with payLightningInvoice.
+   * Works for both BTC and asset payments.
+   *
+   * @param id - The request ID of the Lightning send request
+   * @returns {Promise<LightningSendRequest | null>} Lightning send request response or null if not found
+   * @memberof WalletManager
+   */
+  public async getLightningSendRequest(id: string): Promise<LightningSendRequest | null> {
+    return this.client.getLightningSendRequest(id);
+  }
+
+  /**
+   * Estimates the routing fee required to pay a Lightning invoice.
+   * For asset payments, the returned fee is always denominated in satoshis.
+   *
+   * @param params - Request parameters containing the invoice and optional asset
+   * @returns {Promise<number>} Estimated fee in satoshis
+   * @memberof WalletManager
+   */
+  public async getLightningSendFeeEstimate(params: GetLightningSendFeeEstimateRequestModel): Promise<number> {
+    return this.client.getLightningSendFeeEstimate(params);
+  }
+
+  /**
+   * Begins a Lightning invoice payment process.
+   * Returns the invoice string as a mock PSBT (later will be constructed base64 PSBT).
+   *
+   * @param params - Request parameters containing the invoice and max fee
+   * @returns {Promise<string>} PSBT string (currently returns invoice, later will be base64 PSBT)
+   * @memberof WalletManager
+   */
+  public async payLightningInvoiceBegin(params: PayLightningInvoiceRequestModel): Promise<string> {
+    return this.client.payLightningInvoiceBegin(params);
+  }
+
+  /**
+   * Completes a Lightning invoice payment using signed PSBT.
+   * Works the same as pay-invoice but uses signed_psbt instead of invoice.
+   *
+   * @param params - Request parameters containing the signed PSBT
+   * @returns {Promise<LightningSendRequest>} Lightning send request response
+   * @memberof WalletManager
+   */
+  public async payLightningInvoiceEnd(params: SendAssetEndRequestModel): Promise<LightningSendRequest> {
+    return this.client.payLightningInvoiceEnd(params);
+  }
+
+  /**
+   * Pays a Lightning invoice using the UTEXOWallet.
+   * This method supports BTC Lightning payments and asset-based Lightning payments.
+   * 
+   * This is a convenience method that combines:
+   * 1. payLightningInvoiceBegin - to get the PSBT
+   * 2. signPsbt - to sign the PSBT (mock for now)
+   * 3. payLightningInvoiceEnd - to complete the payment
+   *
+   * @param params - Request parameters containing the invoice and max fee
+   * @param mnemonic - Optional mnemonic for signing (uses wallet's mnemonic if not provided)
+   * @returns {Promise<LightningSendRequest>} Lightning send request response
+   * @memberof WalletManager
+   */
+  public async payLightningInvoice(params: PayLightningInvoiceRequestModel, mnemonic?: string): Promise<LightningSendRequest> {
+    this.ensureNotDisposed();
+    const psbt = await this.payLightningInvoiceBegin(params);
+    // const signed_psbt = await this.signPsbt(psbt, mnemonic);
+    const signed_psbt = psbt;
+    return await this.payLightningInvoiceEnd({ signed_psbt });
+  }
+
+  // ==========================================
+  // Withdrawal API
+  // ==========================================
+
+  /**
+   * Begins a withdrawal process from UTEXO.
+   * Returns the request encoded as base64 (mock PSBT).
+   * Later this should construct and return a real base64 PSBT.
+   *
+   * @param params - Request parameters for withdrawal
+   * @returns {Promise<string>} PSBT string (currently returns encoded request, later will be base64 PSBT)
+   * @memberof WalletManager
+   */
+  public async withdrawBegin(params: WithdrawFromUTEXORequestModel): Promise<string> {
+    return this.client.withdrawBegin(params);
+  }
+
+  /**
+   * Completes a withdrawal from UTEXO using signed PSBT.
+   *
+   * @param params - Request parameters containing the signed PSBT
+   * @returns {Promise<WithdrawFromUTEXOResponse>} Withdrawal response
+   * @memberof WalletManager
+   */
+  public async withdrawEnd(params: SendAssetEndRequestModel): Promise<WithdrawFromUTEXOResponse> {
+    return this.client.withdrawEnd(params);
+  }
+
+  /**
+   * Withdraws BTC or assets from the UTEXO layer back to Bitcoin L1.
+   * This operation creates a Bitcoin transaction that releases funds from UTEXO to a specified on-chain address.
+   * 
+   * This is a convenience method that combines:
+   * 1. withdrawBegin - to get the PSBT
+   * 2. signPsbt - to sign the PSBT (mock for now)
+   * 3. withdrawEnd - to complete the withdrawal
+   *
+   * @param params - Request parameters for withdrawal
+   * @param mnemonic - Optional mnemonic for signing (uses wallet's mnemonic if not provided)
+   * @returns {Promise<WithdrawFromUTEXOResponse>} Withdrawal response
+   * @memberof WalletManager
+   */
+  public async withdraw(params: WithdrawFromUTEXORequestModel, mnemonic?: string): Promise<WithdrawFromUTEXOResponse> {
+    this.ensureNotDisposed();
+    const psbt = await this.withdrawBegin(params);
+    // const signed_psbt = await this.signPsbt(psbt, mnemonic);
+    const signed_psbt = psbt;
+    return await this.withdrawEnd({ signed_psbt });
   }
 
 }
