@@ -451,6 +451,20 @@ export interface SingleUseDepositAddressResponse {
 }
 
 /**
+ * Response model for unused deposit addresses.
+ *
+ * @export
+ * @interface UnusedDepositAddressesResponse
+ */
+export interface UnusedDepositAddressesResponse {
+  /**
+   * @type {Array<SingleUseDepositAddressResponse>}
+   * @memberof UnusedDepositAddressesResponse
+   */
+  addresses: SingleUseDepositAddressResponse[];
+}
+
+/**
  * Model for offchain balance detail.
  *
  * @export
@@ -836,4 +850,98 @@ export interface WithdrawFromUTEXOResponse {
    * @memberof WithdrawFromUTEXOResponse
    */
   txid?: string;
+}
+
+/**
+ * Withdrawal status enum.
+ *
+ * @export
+ * @enum {string}
+ */
+export type WithdrawalStatus = string;
+
+/**
+ * Response model for getting withdrawal status.
+ *
+ * @export
+ * @interface GetWithdrawalResponse
+ */
+export interface GetWithdrawalResponse {
+  /**
+   * @type {string}
+   * @memberof GetWithdrawalResponse
+   */
+  withdrawal_id: string;
+
+  /**
+   * @type {WithdrawalStatus}
+   * @memberof GetWithdrawalResponse
+   */
+  status: WithdrawalStatus;
+
+  /**
+   * @type {string}
+   * @memberof GetWithdrawalResponse
+   */
+  address_or_rgbinvoice: string;
+
+  /**
+   * @type {number}
+   * @memberof GetWithdrawalResponse
+   */
+  amount_sats_requested?: number;
+
+  /**
+   * @type {number}
+   * @memberof GetWithdrawalResponse
+   */
+  amount_sats_sent?: number;
+
+  /**
+   * @type {LightningAsset}
+   * @memberof GetWithdrawalResponse
+   */
+  asset?: LightningAsset;
+
+  /**
+   * @type {Array<string>}
+   * @memberof GetWithdrawalResponse
+   */
+  close_txids: string[];
+
+  /**
+   * @type {string}
+   * @memberof GetWithdrawalResponse
+   */
+  sweep_txid?: string;
+
+  /**
+   * @type {number}
+   * @memberof GetWithdrawalResponse
+   */
+  fee_sats?: number;
+
+  /**
+   * @type {Record<string, number>}
+   * @memberof GetWithdrawalResponse
+   */
+  timestamps: Record<string, number>;
+
+  /**
+   * @type {string}
+   * @memberof GetWithdrawalResponse
+   */
+  error_code?: string;
+
+  /**
+   * @type {string}
+   * @memberof GetWithdrawalResponse
+   */
+  error_message?: string;
+
+  /**
+   * @type {boolean}
+   * @memberof GetWithdrawalResponse
+   */
+  retryable: boolean;
 }

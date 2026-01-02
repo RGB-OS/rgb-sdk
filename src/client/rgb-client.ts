@@ -35,6 +35,7 @@ import {
   OperationResult,
   DecodeRgbInvoiceResponse,
   SingleUseDepositAddressResponse,
+  UnusedDepositAddressesResponse,
   WalletBalanceResponse,
   CreateLightningInvoiceRequestModel,
   LightningReceiveRequest,
@@ -42,7 +43,8 @@ import {
   GetLightningSendFeeEstimateRequestModel,
   PayLightningInvoiceRequestModel,
   WithdrawFromUTEXORequestModel,
-  WithdrawFromUTEXOResponse
+  WithdrawFromUTEXOResponse,
+  GetWithdrawalResponse
 } from "../types/rgb-model";
 
 /**
@@ -275,6 +277,10 @@ export class RGBClient {
     return this.request<SingleUseDepositAddressResponse>("get", "/wallet/single-use-address");
   }
 
+  async getUnusedDepositAddresses(): Promise<UnusedDepositAddressesResponse> {
+    return this.request<UnusedDepositAddressesResponse>("get", "/wallet/unused-addresses");
+  }
+
   async getBalance(): Promise<WalletBalanceResponse> {
     return this.request<WalletBalanceResponse>("get", "/wallet/balance");
   }
@@ -376,5 +382,15 @@ export class RGBClient {
    */
   async withdrawEnd(params: SendAssetEndRequestModel): Promise<WithdrawFromUTEXOResponse> {
     return this.request<WithdrawFromUTEXOResponse>("post", "/wallet/withdraw-end", params);
+  }
+
+  /**
+   * Gets the status of a withdrawal by withdrawal ID.
+   *
+   * @param withdrawal_id - The withdrawal ID
+   * @returns {Promise<GetWithdrawalResponse>} Withdrawal status response
+   */
+  async getWithdrawalStatus(withdrawal_id: string): Promise<GetWithdrawalResponse> {
+    return this.request<GetWithdrawalResponse>("get", `/wallet/withdraw/${withdrawal_id}`);
   }
 }

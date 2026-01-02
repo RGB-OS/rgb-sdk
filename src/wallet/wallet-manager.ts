@@ -30,6 +30,7 @@ import {
   OperationResult,
   DecodeRgbInvoiceResponse,
   SingleUseDepositAddressResponse,
+  UnusedDepositAddressesResponse,
   WalletBalanceResponse,
   CreateLightningInvoiceRequestModel,
   LightningReceiveRequest,
@@ -37,7 +38,8 @@ import {
   GetLightningSendFeeEstimateRequestModel,
   PayLightningInvoiceRequestModel,
   WithdrawFromUTEXORequestModel,
-  WithdrawFromUTEXOResponse
+  WithdrawFromUTEXOResponse,
+  GetWithdrawalResponse
 } from '../types/rgb-model';
 import { signPsbt, signPsbtFromSeed, signMessage as signSchnorrMessage, verifyMessage as verifySchnorrMessage, estimatePsbt } from '../crypto';
 import type { EstimateFeeResult, Network } from '../crypto';
@@ -453,6 +455,17 @@ export class WalletManager {
   }
 
   /**
+   * Get unused deposit addresses.
+   * Returns a list of unused single-use deposit addresses.
+   *
+   * @returns {Promise<UnusedDepositAddressesResponse>} Response containing array of unused deposit addresses
+   * @memberof WalletManager
+   */
+  public async getUnusedDepositAddresses(): Promise<UnusedDepositAddressesResponse> {
+    return this.client.getUnusedDepositAddresses();
+  }
+
+  /**
    * Get wallet balance including BTC balance and asset balances.
    *
    * @returns {Promise<WalletBalanceResponse>} Response containing BTC balance and asset balances
@@ -617,6 +630,17 @@ export class WalletManager {
     // const signed_psbt = await this.signPsbt(psbt, mnemonic);
     const signed_psbt = psbt;
     return await this.withdrawEnd({ signed_psbt });
+  }
+
+  /**
+   * Gets the status of a withdrawal by withdrawal ID.
+   *
+   * @param withdrawal_id - The withdrawal ID
+   * @returns {Promise<GetWithdrawalResponse>} Withdrawal status response
+   * @memberof WalletManager
+   */
+  public async getWithdrawalStatus(withdrawal_id: string): Promise<GetWithdrawalResponse> {
+    return this.client.getWithdrawalStatus(withdrawal_id);
   }
 
 }

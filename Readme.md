@@ -51,6 +51,7 @@ With this SDK, developers can:
 | `downloadBackup(backupId?)` | Download the generated backup binary |
 | `restoreFromBackup({ backup, password, ... })` | Restore wallet state from a backup file |
 | `getSingleUseDepositAddress()` | Get a single-use deposit address for receiving assets |
+| `getUnusedDepositAddresses()` | Get unused deposit addresses |
 | `getBalance()` | Get wallet balance including BTC and asset balances |
 | `settle()` | Settle balances in the wallet |
 | `createLightningInvoice({ amount_sats, asset, ... })` | Create a Lightning invoice for receiving BTC or asset payments |
@@ -63,6 +64,7 @@ With this SDK, developers can:
 | `withdrawBegin({ address_or_rgbinvoice, amount_sats, fee_rate, asset? })` | Begin a withdrawal process from UTEXO |
 | `withdrawEnd({ signed_psbt })` | Complete a withdrawal from UTEXO using signed PSBT |
 | `withdraw({ address_or_rgbinvoice, amount_sats, fee_rate, asset? }, mnemonic?)` | Withdraw BTC or assets from UTEXO to Bitcoin L1 (begin + sign + end) |
+| `getWithdrawalStatus(withdrawal_id)` | Get the status of a withdrawal by withdrawal ID |
 
 ---
 
@@ -366,6 +368,14 @@ const depositAddress = await wallet.getSingleUseDepositAddress();
 console.log('BTC Address:', depositAddress.btc_address);
 console.log('Asset Invoice:', depositAddress.asset_invoice);
 
+// Get unused deposit addresses
+const unusedAddresses = await wallet.getUnusedDepositAddresses();
+console.log('Unused Addresses:', unusedAddresses.addresses);
+unusedAddresses.addresses.forEach(addr => {
+    console.log('Address:', addr.btc_address);
+    console.log('Invoice:', addr.asset_invoice);
+});
+
 // Get comprehensive wallet balance
 const walletBalance = await wallet.getBalance();
 console.log('BTC Balance:', walletBalance.balance);
@@ -569,6 +579,17 @@ const withdrawPsbt = await wallet.withdrawBegin({
 const signedWithdrawPsbt = await wallet.signPsbt(withdrawPsbt);
 const withdrawResult = await wallet.withdrawEnd({ signed_psbt: signedWithdrawPsbt });
 console.log('Withdrawal completed:', withdrawResult.withdrawal_id);
+
+// Check withdrawal status
+const withdrawalStatus = await wallet.getWithdrawalStatus(withdrawResult.withdrawal_id);
+console.log('Withdrawal Status:', withdrawalStatus.status);
+console.log('Amount Sent:', withdrawalStatus.amount_sats_sent);
+console.log('Close TXIDs:', withdrawalStatus.close_txids);
+console.log('Sweep TXID:', withdrawalStatus.sweep_txid);
+if (withdrawalStatus.error_message) {
+    console.log('Error:', withdrawalStatus.error_message);
+    console.log('Retryable:', withdrawalStatus.retryable);
+}
 ```
 
 ---
