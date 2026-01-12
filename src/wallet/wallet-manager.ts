@@ -30,16 +30,16 @@ import {
   OperationResult,
   DecodeRgbInvoiceResponse,
   SingleUseDepositAddressResponse,
-  UnusedDepositAddressesResponse,
   WalletBalanceResponse,
   CreateLightningInvoiceRequestModel,
   LightningReceiveRequest,
   LightningSendRequest,
   GetLightningSendFeeEstimateRequestModel,
   PayLightningInvoiceRequestModel,
-  WithdrawFromUTEXORequestModel,
-  WithdrawFromUTEXOResponse,
-  GetWithdrawalResponse
+  OnchainSendRequestModel,
+  OnchainSendResponse,
+  GetOnchainSendResponse,
+  ListLightningPaymentsResponse
 } from '../types/rgb-model';
 import { signPsbt, signPsbtFromSeed, signMessage as signSchnorrMessage, verifyMessage as verifySchnorrMessage, estimatePsbt } from '../crypto';
 import type { EstimateFeeResult, Network } from '../crypto';
@@ -444,25 +444,14 @@ export class WalletManager {
   // ==========================================
 
   /**
-   * Get a single-use deposit address for receiving assets.
-   * Returns a BTC address and asset invoice that can be used once for deposits.
+   * Get an on-chain receive address for receiving assets.
+   * Returns a BTC address and asset invoice that can be used for on-chain deposits.
    *
    * @returns {Promise<SingleUseDepositAddressResponse>} Response containing btc_address, asset_invoice, and optional expires_at
    * @memberof WalletManager
    */
-  public async getSingleUseDepositAddress(): Promise<SingleUseDepositAddressResponse> {
-    return this.client.getSingleUseDepositAddress();
-  }
-
-  /**
-   * Get unused deposit addresses.
-   * Returns a list of unused single-use deposit addresses.
-   *
-   * @returns {Promise<UnusedDepositAddressesResponse>} Response containing array of unused deposit addresses
-   * @memberof WalletManager
-   */
-  public async getUnusedDepositAddresses(): Promise<UnusedDepositAddressesResponse> {
-    return this.client.getUnusedDepositAddresses();
+  public async onchainReceive(): Promise<SingleUseDepositAddressResponse> {
+    return this.client.onchainReceive();
   }
 
   /**
@@ -587,60 +576,81 @@ export class WalletManager {
   // ==========================================
 
   /**
-   * Begins a withdrawal process from UTEXO.
+   * Begins an on-chain send process from UTEXO.
    * Returns the request encoded as base64 (mock PSBT).
    * Later this should construct and return a real base64 PSBT.
    *
-   * @param params - Request parameters for withdrawal
+   * @param params - Request parameters for on-chain send
    * @returns {Promise<string>} PSBT string (currently returns encoded request, later will be base64 PSBT)
    * @memberof WalletManager
    */
-  public async withdrawBegin(params: WithdrawFromUTEXORequestModel): Promise<string> {
-    return this.client.withdrawBegin(params);
+  public async onchainSendBegin(params: OnchainSendRequestModel): Promise<string> {
+    return this.client.onchainSendBegin(params);
   }
 
   /**
-   * Completes a withdrawal from UTEXO using signed PSBT.
+   * Completes an on-chain send from UTEXO using signed PSBT.
    *
    * @param params - Request parameters containing the signed PSBT
-   * @returns {Promise<WithdrawFromUTEXOResponse>} Withdrawal response
+   * @returns {Promise<OnchainSendResponse>} On-chain send response
    * @memberof WalletManager
    */
-  public async withdrawEnd(params: SendAssetEndRequestModel): Promise<WithdrawFromUTEXOResponse> {
-    return this.client.withdrawEnd(params);
+  public async onchainSendEnd(params: SendAssetEndRequestModel): Promise<OnchainSendResponse> {
+    return this.client.onchainSendEnd(params);
   }
 
   /**
-   * Withdraws BTC or assets from the UTEXO layer back to Bitcoin L1.
+   * Sends BTC or assets on-chain from the UTEXO layer.
    * This operation creates a Bitcoin transaction that releases funds from UTEXO to a specified on-chain address.
    * 
    * This is a convenience method that combines:
-   * 1. withdrawBegin - to get the PSBT
+   * 1. onchainSendBegin - to get the PSBT
    * 2. signPsbt - to sign the PSBT (mock for now)
-   * 3. withdrawEnd - to complete the withdrawal
+   * 3. onchainSendEnd - to complete the on-chain send
    *
-   * @param params - Request parameters for withdrawal
+   * @param params - Request parameters for on-chain send
    * @param mnemonic - Optional mnemonic for signing (uses wallet's mnemonic if not provided)
-   * @returns {Promise<WithdrawFromUTEXOResponse>} Withdrawal response
+   * @returns {Promise<OnchainSendResponse>} On-chain send response
    * @memberof WalletManager
    */
-  public async withdraw(params: WithdrawFromUTEXORequestModel, mnemonic?: string): Promise<WithdrawFromUTEXOResponse> {
+  public async onchainSend(params: OnchainSendRequestModel, mnemonic?: string): Promise<OnchainSendResponse> {
     this.ensureNotDisposed();
-    const psbt = await this.withdrawBegin(params);
+    const psbt = await this.onchainSendBegin(params);
     // const signed_psbt = await this.signPsbt(psbt, mnemonic);
     const signed_psbt = psbt;
-    return await this.withdrawEnd({ signed_psbt });
+    return await this.onchainSendEnd({ signed_psbt });
   }
 
   /**
-   * Gets the status of a withdrawal by withdrawal ID.
+   * Gets the status of an on-chain send by send ID.
    *
-   * @param withdrawal_id - The withdrawal ID
-   * @returns {Promise<GetWithdrawalResponse>} Withdrawal status response
+   * @param send_id - The on-chain send ID
+   * @returns {Promise<GetOnchainSendResponse>} On-chain send status response
    * @memberof WalletManager
    */
-  public async getWithdrawalStatus(withdrawal_id: string): Promise<GetWithdrawalResponse> {
-    return this.client.getWithdrawalStatus(withdrawal_id);
+  public async getOnchainSendStatus(send_id: string): Promise<GetOnchainSendResponse> {
+    return this.client.getOnchainSendStatus(send_id);
+  }
+
+  /**
+   * Lists on-chain transfers for a specific asset.
+   *
+   * @param asset_id - The asset ID to list transfers for
+   * @returns {Promise<RgbTransfer[]>} Array of on-chain transfers
+   * @memberof WalletManager
+   */
+  public async listOnchainTransfers(asset_id: string): Promise<RgbTransfer[]> {
+    return this.client.listOnchainTransfers(asset_id);
+  }
+
+  /**
+   * Lists Lightning payments.
+   *
+   * @returns {Promise<ListLightningPaymentsResponse>} Response containing array of Lightning payments
+   * @memberof WalletManager
+   */
+  public async listLightningPayments(): Promise<ListLightningPaymentsResponse> {
+    return this.client.listLightningPayments();
   }
 
 }

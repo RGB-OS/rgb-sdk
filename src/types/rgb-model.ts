@@ -801,147 +801,231 @@ export interface PayLightningInvoiceRequestModel {
 }
 
 /**
- * Request model for withdrawing from UTEXO.
+ * Request model for on-chain send from UTEXO.
  *
  * @export
- * @interface WithdrawFromUTEXORequestModel
+ * @interface OnchainSendRequestModel
  */
-export interface WithdrawFromUTEXORequestModel {
+export interface OnchainSendRequestModel {
   /**
    * @type {string}
-   * @memberof WithdrawFromUTEXORequestModel
+   * @memberof OnchainSendRequestModel
    */
   address_or_rgbinvoice: string;
 
   /**
    * @type {number}
-   * @memberof WithdrawFromUTEXORequestModel
+   * @memberof OnchainSendRequestModel
    */
   amount_sats?: number;
 
   /**
    * @type {number}
-   * @memberof WithdrawFromUTEXORequestModel
+   * @memberof OnchainSendRequestModel
    */
   fee_rate: number;
 
   /**
    * @type {LightningAsset}
-   * @memberof WithdrawFromUTEXORequestModel
+   * @memberof OnchainSendRequestModel
    */
   asset?: LightningAsset;
 }
 
 /**
- * Response model for UTEXO withdrawal.
+ * Response model for on-chain send from UTEXO.
  *
  * @export
- * @interface WithdrawFromUTEXOResponse
+ * @interface OnchainSendResponse
  */
-export interface WithdrawFromUTEXOResponse {
+export interface OnchainSendResponse {
   /**
    * @type {string}
-   * @memberof WithdrawFromUTEXOResponse
+   * @memberof OnchainSendResponse
    */
-  withdrawal_id: string;
+  send_id: string;
 
   /**
    * @type {string}
-   * @memberof WithdrawFromUTEXOResponse
+   * @memberof OnchainSendResponse
    */
   txid?: string;
 }
 
 /**
- * Withdrawal status enum.
+ * On-chain send status enum.
  *
  * @export
  * @enum {string}
  */
-export type WithdrawalStatus = string;
+export type OnchainSendStatus = string;
 
 /**
- * Response model for getting withdrawal status.
+ * Response model for getting on-chain send status.
  *
  * @export
- * @interface GetWithdrawalResponse
+ * @interface GetOnchainSendResponse
  */
-export interface GetWithdrawalResponse {
+export interface GetOnchainSendResponse {
   /**
    * @type {string}
-   * @memberof GetWithdrawalResponse
+   * @memberof GetOnchainSendResponse
    */
-  withdrawal_id: string;
+  send_id: string;
 
   /**
-   * @type {WithdrawalStatus}
-   * @memberof GetWithdrawalResponse
+   * @type {OnchainSendStatus}
+   * @memberof GetOnchainSendResponse
    */
-  status: WithdrawalStatus;
+  status: OnchainSendStatus;
 
   /**
    * @type {string}
-   * @memberof GetWithdrawalResponse
+   * @memberof GetOnchainSendResponse
    */
   address_or_rgbinvoice: string;
 
   /**
    * @type {number}
-   * @memberof GetWithdrawalResponse
+   * @memberof GetOnchainSendResponse
    */
   amount_sats_requested?: number;
 
   /**
    * @type {number}
-   * @memberof GetWithdrawalResponse
+   * @memberof GetOnchainSendResponse
    */
   amount_sats_sent?: number;
 
   /**
    * @type {LightningAsset}
-   * @memberof GetWithdrawalResponse
+   * @memberof GetOnchainSendResponse
    */
   asset?: LightningAsset;
 
   /**
    * @type {Array<string>}
-   * @memberof GetWithdrawalResponse
+   * @memberof GetOnchainSendResponse
    */
   close_txids: string[];
 
   /**
    * @type {string}
-   * @memberof GetWithdrawalResponse
+   * @memberof GetOnchainSendResponse
    */
   sweep_txid?: string;
 
   /**
    * @type {number}
-   * @memberof GetWithdrawalResponse
+   * @memberof GetOnchainSendResponse
    */
   fee_sats?: number;
 
   /**
    * @type {Record<string, number>}
-   * @memberof GetWithdrawalResponse
+   * @memberof GetOnchainSendResponse
    */
   timestamps: Record<string, number>;
 
   /**
    * @type {string}
-   * @memberof GetWithdrawalResponse
+   * @memberof GetOnchainSendResponse
    */
   error_code?: string;
 
   /**
    * @type {string}
-   * @memberof GetWithdrawalResponse
+   * @memberof GetOnchainSendResponse
    */
   error_message?: string;
 
   /**
    * @type {boolean}
-   * @memberof GetWithdrawalResponse
+   * @memberof GetOnchainSendResponse
    */
   retryable: boolean;
+}
+
+/**
+ * HTLC status enum.
+ *
+ * @export
+ * @enum {string}
+ */
+export type HTLCStatus = 'Pending' | 'Succeeded' | 'Failed';
+
+/**
+ * Payment model for Lightning payments.
+ *
+ * @export
+ * @interface Payment
+ */
+export interface Payment {
+  /**
+   * @type {number}
+   * @memberof Payment
+   */
+  amt_msat: number;
+
+  /**
+   * @type {number}
+   * @memberof Payment
+   */
+  asset_amount?: number;
+
+  /**
+   * @type {string}
+   * @memberof Payment
+   */
+  asset_id?: string;
+
+  /**
+   * @type {string}
+   * @memberof Payment
+   */
+  payment_hash: string;
+
+  /**
+   * @type {boolean}
+   * @memberof Payment
+   */
+  inbound: boolean;
+
+  /**
+   * @type {HTLCStatus}
+   * @memberof Payment
+   */
+  status: HTLCStatus;
+
+  /**
+   * @type {number}
+   * @memberof Payment
+   */
+  created_at: number;
+
+  /**
+   * @type {number}
+   * @memberof Payment
+   */
+  updated_at: number;
+
+  /**
+   * @type {string}
+   * @memberof Payment
+   */
+  payee_pubkey?: string;
+}
+
+/**
+ * Response model for listing Lightning payments.
+ *
+ * @export
+ * @interface ListLightningPaymentsResponse
+ */
+export interface ListLightningPaymentsResponse {
+  /**
+   * @type {Array<Payment>}
+   * @memberof ListLightningPaymentsResponse
+   */
+  payments: Payment[];
 }

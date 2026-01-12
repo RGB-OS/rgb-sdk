@@ -50,10 +50,6 @@ With this SDK, developers can:
 | `createBackup(password)` | Create an encrypted wallet backup on the RGB node |
 | `downloadBackup(backupId?)` | Download the generated backup binary |
 | `restoreFromBackup({ backup, password, ... })` | Restore wallet state from a backup file |
-| `getSingleUseDepositAddress()` | Get a single-use deposit address for receiving assets |
-| `getUnusedDepositAddresses()` | Get unused deposit addresses |
-| `getBalance()` | Get wallet balance including BTC and asset balances |
-| `settle()` | Settle balances in the wallet |
 | `createLightningInvoice({ amount_sats, asset, ... })` | Create a Lightning invoice for receiving BTC or asset payments |
 | `getLightningReceiveRequest(id)` | Get the status of a Lightning invoice by request ID |
 | `getLightningSendRequest(id)` | Get the status of a Lightning payment by request ID |
@@ -61,10 +57,15 @@ With this SDK, developers can:
 | `payLightningInvoiceBegin({ invoice, max_fee_sats })` | Begin a Lightning invoice payment process |
 | `payLightningInvoiceEnd({ signed_psbt })` | Complete a Lightning invoice payment using signed PSBT |
 | `payLightningInvoice({ invoice, max_fee_sats }, mnemonic?)` | Pay a Lightning invoice (begin + sign + end) |
-| `withdrawBegin({ address_or_rgbinvoice, amount_sats, fee_rate, asset? })` | Begin a withdrawal process from UTEXO |
-| `withdrawEnd({ signed_psbt })` | Complete a withdrawal from UTEXO using signed PSBT |
-| `withdraw({ address_or_rgbinvoice, amount_sats, fee_rate, asset? }, mnemonic?)` | Withdraw BTC or assets from UTEXO to Bitcoin L1 (begin + sign + end) |
-| `getWithdrawalStatus(withdrawal_id)` | Get the status of a withdrawal by withdrawal ID |
+| `listLightningPayments()` | List Lightning payments |
+| `onchainReceive()` | Get an on-chain receive address for receiving assets |
+| `getBalance()` | Get wallet balance including BTC and asset balances |
+| `settle()` | Settle balances in the wallet |
+| `onchainSendBegin({ address_or_rgbinvoice, amount_sats, fee_rate, asset? })` | Begin an on-chain send process from UTEXO |
+| `onchainSendEnd({ signed_psbt })` | Complete an on-chain send from UTEXO using signed PSBT |
+| `onchainSend({ address_or_rgbinvoice, amount_sats, fee_rate, asset? }, mnemonic?)` | Send BTC or assets on-chain from UTEXO (begin + sign + end) |
+| `getOnchainSendStatus(send_id)` | Get the status of an on-chain send by send ID |
+| `listOnchainTransfers(asset_id)` | List on-chain transfers for a specific asset |
 
 ---
 
@@ -362,28 +363,6 @@ const transactions = await wallet.listTransactions();
 
 // List transfers for specific asset
 const transfers = await wallet.listTransfers(asset_id);
-
-// Get single-use deposit address
-const depositAddress = await wallet.getSingleUseDepositAddress();
-console.log('BTC Address:', depositAddress.btc_address);
-console.log('Asset Invoice:', depositAddress.asset_invoice);
-
-// Get unused deposit addresses
-const unusedAddresses = await wallet.getUnusedDepositAddresses();
-console.log('Unused Addresses:', unusedAddresses.addresses);
-unusedAddresses.addresses.forEach(addr => {
-    console.log('Address:', addr.btc_address);
-    console.log('Invoice:', addr.asset_invoice);
-});
-
-// Get comprehensive wallet balance
-const walletBalance = await wallet.getBalance();
-console.log('BTC Balance:', walletBalance.balance);
-console.log('Asset Balances:', walletBalance.asset_balances);
-
-// Settle wallet balances
-const settlementResult = await wallet.settle();
-console.log('Settlement result:', settlementResult);
 ```
 
 ---
@@ -541,25 +520,57 @@ console.log('Payment completed:', sendResult.id);
 
 ---
 
-## Withdrawal API
+## Onchain Lightning API
 
-### Withdraw from UTEXO
+### On-chain Receive and Balance
 
-Withdraws BTC or assets from the UTEXO layer back to Bitcoin L1. This operation creates a Bitcoin transaction that releases funds from UTEXO to a specified on-chain address.
+Get on-chain receive addresses, check balances, and settle wallet state.
 
 ```javascript
-// Withdraw BTC from UTEXO to Bitcoin L1
-const withdrawal = await wallet.withdraw({
+// Get on-chain receive address
+const depositAddress = await wallet.onchainReceive();
+console.log('BTC Address:', depositAddress.btc_address);
+console.log('Asset Invoice:', depositAddress.asset_invoice);
+
+// Get comprehensive wallet balance
+const walletBalance = await wallet.getBalance();
+console.log('BTC Balance:', walletBalance.balance);
+console.log('Asset Balances:', walletBalance.asset_balances);
+
+// Settle wallet balances
+const settlementResult = await wallet.settle();
+console.log('Settlement result:', settlementResult);
+
+// List on-chain transfers for a specific asset
+const onchainTransfers = await wallet.listOnchainTransfers(asset_id);
+console.log('On-chain Transfers:', onchainTransfers);
+
+// List Lightning payments
+const payments = await wallet.listLightningPayments();
+console.log('Lightning Payments:', payments.payments);
+```
+
+---
+
+## On-chain Send API
+
+### Send from UTEXO
+
+Sends BTC or assets on-chain from the UTEXO layer. This operation creates a Bitcoin transaction that releases funds from UTEXO to a specified on-chain address.
+
+```javascript
+// Send BTC on-chain from UTEXO
+const sendResult = await wallet.onchainSend({
     address_or_rgbinvoice: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',  // Bitcoin address
     amount_sats: 100000,  // Amount in satoshis
     fee_rate: 1  // Fee rate
 });
 
-console.log('Withdrawal ID:', withdrawal.withdrawal_id);
-console.log('Transaction ID:', withdrawal.txid);
+console.log('On-chain Send ID:', sendResult.send_id);
+console.log('Transaction ID:', sendResult.txid);
 
-// Withdraw asset from UTEXO
-const assetWithdrawal = await wallet.withdraw({
+// Send asset on-chain from UTEXO
+const assetSendResult = await wallet.onchainSend({
     address_or_rgbinvoice: 'rgb:1234567890abcdef...',  // RGB invoice or address
     fee_rate: 1,
     asset: {
@@ -568,27 +579,27 @@ const assetWithdrawal = await wallet.withdraw({
     }
 });
 
-console.log('Asset Withdrawal ID:', assetWithdrawal.withdrawal_id);
+console.log('Asset On-chain Send ID:', assetSendResult.send_id);
 
-// Alternative: Manual withdrawal flow (begin + sign + end)
-const withdrawPsbt = await wallet.withdrawBegin({
+// Alternative: Manual on-chain send flow (begin + sign + end)
+const sendPsbt = await wallet.onchainSendBegin({
     address_or_rgbinvoice: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
     amount_sats: 100000,
     fee_rate: 1
 });
-const signedWithdrawPsbt = await wallet.signPsbt(withdrawPsbt);
-const withdrawResult = await wallet.withdrawEnd({ signed_psbt: signedWithdrawPsbt });
-console.log('Withdrawal completed:', withdrawResult.withdrawal_id);
+const signedSendPsbt = await wallet.signPsbt(sendPsbt);
+const sendEndResult = await wallet.onchainSendEnd({ signed_psbt: signedSendPsbt });
+console.log('On-chain send completed:', sendEndResult.send_id);
 
-// Check withdrawal status
-const withdrawalStatus = await wallet.getWithdrawalStatus(withdrawResult.withdrawal_id);
-console.log('Withdrawal Status:', withdrawalStatus.status);
-console.log('Amount Sent:', withdrawalStatus.amount_sats_sent);
-console.log('Close TXIDs:', withdrawalStatus.close_txids);
-console.log('Sweep TXID:', withdrawalStatus.sweep_txid);
-if (withdrawalStatus.error_message) {
-    console.log('Error:', withdrawalStatus.error_message);
-    console.log('Retryable:', withdrawalStatus.retryable);
+// Check on-chain send status
+const sendStatus = await wallet.getOnchainSendStatus(sendEndResult.send_id);
+console.log('On-chain Send Status:', sendStatus.status);
+console.log('Amount Sent:', sendStatus.amount_sats_sent);
+console.log('Close TXIDs:', sendStatus.close_txids);
+console.log('Sweep TXID:', sendStatus.sweep_txid);
+if (sendStatus.error_message) {
+    console.log('Error:', sendStatus.error_message);
+    console.log('Retryable:', sendStatus.retryable);
 }
 ```
 

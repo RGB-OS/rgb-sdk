@@ -35,16 +35,16 @@ import {
   OperationResult,
   DecodeRgbInvoiceResponse,
   SingleUseDepositAddressResponse,
-  UnusedDepositAddressesResponse,
   WalletBalanceResponse,
   CreateLightningInvoiceRequestModel,
   LightningReceiveRequest,
   LightningSendRequest,
   GetLightningSendFeeEstimateRequestModel,
   PayLightningInvoiceRequestModel,
-  WithdrawFromUTEXORequestModel,
-  WithdrawFromUTEXOResponse,
-  GetWithdrawalResponse
+  OnchainSendRequestModel,
+  OnchainSendResponse,
+  GetOnchainSendResponse,
+  ListLightningPaymentsResponse
 } from "../types/rgb-model";
 
 /**
@@ -270,26 +270,6 @@ export class RGBClient {
   }
 
   // ==========================================
-  // Deposit & UTEXO API
-  // ==========================================
-
-  async getSingleUseDepositAddress(): Promise<SingleUseDepositAddressResponse> {
-    return this.request<SingleUseDepositAddressResponse>("get", "/wallet/single-use-address");
-  }
-
-  async getUnusedDepositAddresses(): Promise<UnusedDepositAddressesResponse> {
-    return this.request<UnusedDepositAddressesResponse>("get", "/wallet/unused-addresses");
-  }
-
-  async getBalance(): Promise<WalletBalanceResponse> {
-    return this.request<WalletBalanceResponse>("get", "/wallet/balance");
-  }
-
-  async settle(): Promise<Record<string, any>> {
-    return this.request<Record<string, any>>("post", "/wallet/settle");
-  }
-
-  // ==========================================
   // Lightning API
   // ==========================================
 
@@ -358,39 +338,71 @@ export class RGBClient {
     return this.request<LightningSendRequest>("post", "/lightning/pay-invoice-end", params);
   }
 
-  // ==========================================
-  // Withdrawal API
+    /**
+    * Lists Lightning payments.
+    *
+    * @returns {Promise<ListLightningPaymentsResponse>} Response containing array of Lightning payments
+    */
+    async listLightningPayments(): Promise<ListLightningPaymentsResponse> {
+     return this.request<ListLightningPaymentsResponse>("get", "/lightning/listpayments");
+   }
+
+ // ==========================================
+  // Onchain Lightning API
   // ==========================================
 
+  async onchainReceive(): Promise<SingleUseDepositAddressResponse> {
+    return this.request<SingleUseDepositAddressResponse>("get", "/lightning/onchain-receive");
+  }
+
+  async getBalance(): Promise<WalletBalanceResponse> {
+    return this.request<WalletBalanceResponse>("get", "/lightning/balance");
+  }
+
+  async settle(): Promise<Record<string, any>> {
+    return this.request<Record<string, any>>("post", "/lightning/settle");
+  }
+
   /**
-   * Begins a withdrawal process from UTEXO.
+   * Begins an on-chain send process from UTEXO.
    * Returns the request encoded as base64 (mock PSBT).
    * Later this should construct and return a real base64 PSBT.
    *
-   * @param params - Request parameters for withdrawal
+   * @param params - Request parameters for on-chain send
    * @returns {Promise<string>} PSBT string (currently returns encoded request, later will be base64 PSBT)
    */
-  async withdrawBegin(params: WithdrawFromUTEXORequestModel): Promise<string> {
-    return this.request<string>("post", "/wallet/withdraw-begin", params);
+  async onchainSendBegin(params: OnchainSendRequestModel): Promise<string> {
+    return this.request<string>("post", "/lightning/onchain-send-begin", params);
   }
 
   /**
-   * Completes a withdrawal from UTEXO using signed PSBT.
+   * Completes an on-chain send from UTEXO using signed PSBT.
    *
    * @param params - Request parameters containing the signed PSBT
-   * @returns {Promise<WithdrawFromUTEXOResponse>} Withdrawal response
+   * @returns {Promise<OnchainSendResponse>} On-chain send response
    */
-  async withdrawEnd(params: SendAssetEndRequestModel): Promise<WithdrawFromUTEXOResponse> {
-    return this.request<WithdrawFromUTEXOResponse>("post", "/wallet/withdraw-end", params);
+  async onchainSendEnd(params: SendAssetEndRequestModel): Promise<OnchainSendResponse> {
+    return this.request<OnchainSendResponse>("post", "/lightning/onchain-send-end", params);
   }
 
   /**
-   * Gets the status of a withdrawal by withdrawal ID.
+   * Gets the status of an on-chain send by send ID.
    *
-   * @param withdrawal_id - The withdrawal ID
-   * @returns {Promise<GetWithdrawalResponse>} Withdrawal status response
+   * @param send_id - The on-chain send ID
+   * @returns {Promise<GetOnchainSendResponse>} On-chain send status response
    */
-  async getWithdrawalStatus(withdrawal_id: string): Promise<GetWithdrawalResponse> {
-    return this.request<GetWithdrawalResponse>("get", `/wallet/withdraw/${withdrawal_id}`);
+  async getOnchainSendStatus(send_id: string): Promise<GetOnchainSendResponse> {
+    return this.request<GetOnchainSendResponse>("get", `/onchain-send/${send_id}`);
   }
+
+  /**
+   * Lists on-chain transfers for a specific asset.
+   *
+   * @param asset_id - The asset ID to list transfers for
+   * @returns {Promise<RgbTransfer[]>} Array of on-chain transfers
+   */
+  async listOnchainTransfers(asset_id: string): Promise<RgbTransfer[]> {
+    return this.request<RgbTransfer[]>("post", "/lightning/listtransfers", { asset_id });
+  }
+
 }
