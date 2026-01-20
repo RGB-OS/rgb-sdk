@@ -269,8 +269,8 @@ const psbt = await wallet.createUtxosBegin({
     fee_rate: 1
 });
 
-// Step 2: Sign the PSBT (synchronous operation)
-const signed_psbt = wallet.signPsbt(psbt);
+// Step 2: Sign the PSBT (async operation)
+const signed_psbt = await wallet.signPsbt(psbt);
 
 // Step 3: Finalize UTXO creation
 const utxosCreated = await wallet.createUtxosEnd({ signed_psbt });
@@ -307,8 +307,8 @@ const sendPsbt = await senderWallet.sendBegin({
     min_confirmations: 1
 });
 
-// Step 2: Sign the PSBT (synchronous operation)
-const signed_send_psbt = senderWallet.signPsbt(sendPsbt);
+// Step 2: Sign the PSBT (async operation)
+const signed_send_psbt = await senderWallet.signPsbt(sendPsbt);
 
 // Step 3: Finalize transfer
 const sendResult = await senderWallet.sendEnd({ 
@@ -384,7 +384,7 @@ async function demo() {
         size: 1000,
         fee_rate: 1
     });
-    const signed_psbt = wallet.signPsbt(psbt); // Synchronous operation
+    const signed_psbt = await wallet.signPsbt(psbt); // Async operation
     const utxosCreated = await wallet.createUtxosEnd({ signed_psbt });
 
     // 5. Issue asset

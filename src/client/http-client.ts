@@ -51,9 +51,25 @@ export const createClient = (params: RGBHTTPClientParams): AxiosInstance => {
     }
     if (data && typeof data === 'object') {
       // Try common error message fields
-      if (data.detail) return String(data.detail);
-      if (data.message) return String(data.message);
-      if (data.error) return String(data.error);
+      if (data.detail) {
+        if (typeof data.detail === 'string') {
+          return data.detail;
+        }
+        // If detail is an object or array, stringify it for better readability
+        return JSON.stringify(data.detail, null, 2);
+      }
+      if (data.message) {
+        if (typeof data.message === 'string') {
+          return data.message;
+        }
+        return JSON.stringify(data.message, null, 2);
+      }
+      if (data.error) {
+        if (typeof data.error === 'string') {
+          return data.error;
+        }
+        return JSON.stringify(data.error, null, 2);
+      }
     }
     return defaultMessage;
   };
@@ -98,10 +114,14 @@ export const createClient = (params: RGBHTTPClientParams): AxiosInstance => {
         const defaultMessage = `API request failed: ${status} ${error.response.statusText || 'Unknown error'}`;
         const message = extractErrorMessage(status, data, defaultMessage);
         
+        const logData = typeof data === 'object' && data !== null 
+          ? JSON.stringify(data, null, 2) 
+          : data;
+        
         logger.error('API Error:', {
           status,
           url,
-          data,
+          data: logData,
           message,
         });
 
