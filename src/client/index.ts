@@ -7,6 +7,9 @@
 // Re-export RGB client class explicitly
 export { RGBClient } from './rgb-client';
 
+// Export RGB Lib client (local implementation)
+export { RGBLibClient } from './rgb-lib-client';
+
 // Export HTTP client factory
 export { createClient } from './http-client';
 

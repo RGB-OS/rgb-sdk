@@ -1,4 +1,4 @@
-import { RGBClient } from '../client/index';
+import { RGBLibClient } from '../client/index';
 import {
   CreateUtxosBeginRequestModel,
   CreateUtxosEndRequestModel,
@@ -57,13 +57,15 @@ export type WalletInitParams = {
   network?: string | number;
   xpub?: string;
   master_fingerprint: string;
+  transportEndpoint?: string;
+  indexerUrl?: string;
 }
 
 /**
  * Wallet Manager - High-level wallet interface combining RGB API client and cryptographic operations
  * 
  * This class provides a unified interface for:
- * - RGB Node API interactions (via RGBClient)
+ * - RGB operations (via RGBLibClient - local rgb-lib)
  * - PSBT signing operations
  * - Wallet state management
  * 
@@ -83,7 +85,7 @@ export type WalletInitParams = {
  * ```
  */
 export class WalletManager {
-  private readonly client: RGBClient;
+  private readonly client: RGBLibClient;
   private readonly xpub: string | null;
   private readonly xpub_van: string;
   private readonly xpub_col: string;
@@ -94,38 +96,33 @@ export class WalletManager {
   private disposed: boolean = false;
 
   constructor(params: WalletInitParams) {
-    // Validate required parameters
     if (!params.xpub_van) {
       throw new ValidationError('xpub_van is required', 'xpub_van');
     }
     if (!params.xpub_col) {
       throw new ValidationError('xpub_col is required', 'xpub_col');
     }
-    if (!params.rgb_node_endpoint) {
-      throw new ValidationError('rgb_node_endpoint is required', 'rgb_node_endpoint');
-    }
     if (!params.master_fingerprint) {
       throw new ValidationError('master_fingerprint is required', 'master_fingerprint');
     }
 
-    // Initialize RGB client
-    this.client = new RGBClient({
+    this.network = normalizeNetwork(params.network ?? 'regtest');
+
+    this.client = new RGBLibClient({
       xpub_van: params.xpub_van,
       xpub_col: params.xpub_col,
-      rgbEndpoint: params.rgb_node_endpoint,
       master_fingerprint: params.master_fingerprint,
+      network: this.network,
+      transportEndpoint: params.transportEndpoint,
+      indexerUrl: params.indexerUrl,
     });
 
-    // Store wallet state
     this.xpub_van = params.xpub_van;
     this.xpub_col = params.xpub_col;
     this.seed = params.seed ?? null;
     this.mnemonic = params.mnemonic ?? null;
     this.xpub = params.xpub ?? null;
     this.masterFingerprint = params.master_fingerprint;
-
-    // Normalize network using utility function
-    this.network = normalizeNetwork(params.network ?? 'regtest');
   }
 
   /**
@@ -183,8 +180,6 @@ export class WalletManager {
       throw new WalletError('Wallet has been disposed');
     }
   }
-
-  // ========== RGB API Methods (delegated to RGBClient) ==========
 
   public async registerWallet(): Promise<{ address: string; btc_balance: BtcBalance }> {
     return this.client.registerWallet();
