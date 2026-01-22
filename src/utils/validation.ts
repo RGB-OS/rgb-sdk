@@ -2,7 +2,7 @@ import { ValidationError } from '../errors';
 import type { Network } from '../crypto/types';
 import { NETWORK_MAP } from '../constants';
 
-const VALID_NETWORKS: Network[] = ['mainnet', 'testnet', 'signet', 'regtest'];
+const VALID_NETWORKS: Network[] = ['mainnet', 'testnet','testnet4', 'signet', 'regtest'];
 
 export function validateNetwork(network: string | number): asserts network is Network {
   const key = String(network);

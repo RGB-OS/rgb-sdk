@@ -1,3 +1,4 @@
+import { Wallet } from './../../bdk-wasm/pkg/bitcoindevkit.d';
 /**
  * RGB Lib Client - Local client using rgb-lib directly instead of HTTP server
  * 
@@ -5,7 +6,7 @@
  * without requiring an RGB Node server.
  */
 import * as path from 'path';
-import * as os from 'os';
+
 import * as fs from 'fs';
 import type { Readable } from 'stream';
 
@@ -32,6 +33,7 @@ import {
   Unspent,
   WalletBackupResponse,
   WalletRestoreResponse,
+  RestoreWalletRequestModel,
   SendBtcBeginRequestModel,
   SendBtcEndRequestModel,
   GetFeeEstimationRequestModel,
@@ -42,44 +44,56 @@ import {
   InflateAssetIfaRequestModel,
   InflateEndRequestModel,
   OperationResult,
-  DecodeRgbInvoiceResponse
+  DecodeRgbInvoiceResponse,
+  WitnessData
 } from '../types/rgb-model';
 import { ValidationError, WalletError, CryptoError } from '../errors';
 import { normalizeNetwork } from '../utils/validation';
 import type { Network } from '../crypto/types';
-
-let rgbLib: any;
-try {
-  rgbLib = require('rgb-lib');
-} catch (error) {
-  throw new CryptoError('Failed to load rgb-lib-wrapper. Make sure rgb-lib is properly installed.', error as Error);
-}
-
+import * as rgblib from 'rgb-lib';
 /**
  * Map network from client format to rgb-lib format
  */
-function mapNetworkToRgbLib(network: Network): string {
-  const networkMap: Record<Network, string> = {
+function mapNetworkToRgbLib(network: string): string {
+  const networkMap: Record<string, string> = {
     'mainnet': 'Mainnet',
     'testnet': 'Testnet',
+    'testnet4': 'Testnet4',
     'signet': 'Signet',
     'regtest': 'Regtest',
   };
-  return networkMap[network] || 'Regtest';
+  const networkStr = String(network).toLowerCase();
+  return networkMap[networkStr] || 'Regtest';
 }
 
-/**
- * Map network from rgb-lib format to client format
- */
-function mapNetworkFromRgbLib(network: string): Network {
-  const networkMap: Record<string, Network> = {
-    'Mainnet': 'mainnet',
-    'Testnet': 'testnet',
-    'Testnet4': 'testnet',
-    'Signet': 'signet',
-    'Regtest': 'regtest',
+export interface RgbLibGeneratedKeys {
+  mnemonic: string;
+  xpub: string;
+  accountXpubVanilla: string;
+  accountXpubColored: string;
+  masterFingerprint: string;
+}
+
+export const generateKeys = (network: string = 'regtest'): RgbLibGeneratedKeys => {
+  return rgblib.generateKeys(mapNetworkToRgbLib(network));
+}
+
+export const restoreWallet = (params: { backupFilePath: string; password: string; dataDir: string }): WalletRestoreResponse => {
+  const { backupFilePath, password, dataDir } = params;
+  
+  if (!fs.existsSync(backupFilePath)) {
+    throw new ValidationError('Backup file not found', 'backup');
+  }
+  
+  if (!fs.existsSync(dataDir)) {
+    throw new ValidationError(`Restore directory does not exist: ${dataDir}`, 'restoreDir');
+  }
+  
+  rgblib.restoreBackup(backupFilePath, password, dataDir);
+  
+  return {
+    message: 'Wallet restored successfully',
   };
-  return networkMap[network] || 'regtest';
 }
 
 /**
@@ -92,25 +106,27 @@ export class RGBLibClient {
   private readonly xpubCol: string;
   private readonly masterFingerprint: string;
   private readonly network: Network;
+  private readonly originalNetwork: string; // Preserve original input for rgb-lib mapping
   private readonly dataDir: string;
   private readonly transportEndpoint: string;
   private readonly indexerUrl: string;
 
   constructor(params: {
-    xpub_van: string;
-    xpub_col: string;
-    master_fingerprint: string;
-    dataDir?: string;
-    network?: string | number;
+    xpubVan: string;
+    xpubCol: string;
+    masterFingerprint: string;
+    dataDir: string;
+    network: string;
     transportEndpoint?: string;
     indexerUrl?: string;
   }) {
-    this.xpubVan = params.xpub_van;
-    this.xpubCol = params.xpub_col;
-    this.masterFingerprint = params.master_fingerprint;
-    this.network = normalizeNetwork(params.network || 'regtest');
+    this.xpubVan = params.xpubVan;
+    this.xpubCol = params.xpubCol;
+    this.masterFingerprint = params.masterFingerprint;
+    this.originalNetwork = params.network;
+    this.network = normalizeNetwork(this.originalNetwork);
     
-    this.dataDir = params.dataDir || path.join(os.tmpdir(), 'rgb-wallet', this.masterFingerprint);
+    this.dataDir = params.dataDir;
     this.transportEndpoint = params.transportEndpoint || DEFAULT_TRANSPORT_ENDPOINT;
     
     if (params.indexerUrl) {
@@ -119,8 +135,9 @@ export class RGBLibClient {
       const defaultIndexerUrls: Record<Network, string> = {
         'mainnet': 'ssl://electrum.iriswallet.com:50003',
         'testnet': 'ssl://electrum.iriswallet.com:50013',
+        'testnet4': 'ssl://electrum.iriswallet.com:50053',
         'signet': 'tcp://46.224.75.237:50001',
-        'regtest': 'tcp:/regtest.thunderstack.org:50001',
+        'regtest': 'tcp://regtest.thunderstack.org:50001',
       };
       this.indexerUrl = defaultIndexerUrls[this.network] || defaultIndexerUrls['regtest'];
     }
@@ -131,16 +148,22 @@ export class RGBLibClient {
 
     const walletData = {
       dataDir: this.dataDir,
-      bitcoinNetwork: mapNetworkToRgbLib(this.network),
-      databaseType: 'Sqlite',
+      bitcoinNetwork: mapNetworkToRgbLib(this.originalNetwork),
+      databaseType: rgblib.DatabaseType.Sqlite,
       accountXpubVanilla: this.xpubVan,
       accountXpubColored: this.xpubCol,
-      maxAllocationsPerUtxo: 1,
-      vanillaKeychain: undefined,
+      masterFingerprint: this.masterFingerprint,
+      maxAllocationsPerUtxo: '1',
+      vanillaKeychain: "1",
+      supportedSchemas: [
+        rgblib.AssetSchema.Cfa,
+        rgblib.AssetSchema.Nia,
+        rgblib.AssetSchema.Uda,
+      ],
     };
 
     try {
-      this.wallet = new rgbLib.Wallet(walletData);
+      this.wallet = new rgblib.Wallet(new rgblib.WalletData(walletData));
     } catch (error) {
       throw new WalletError('Failed to initialize rgb-lib wallet', undefined, error as Error);
     }
@@ -149,12 +172,13 @@ export class RGBLibClient {
   /**
    * Ensure online connection is established
    */
-  private async ensureOnline(): Promise<void> {
+  private ensureOnline(): void {
     if (this.online) {
       return;
     }
 
     try {
+      console.log('indexerUrl', this.indexerUrl);
       this.online = this.wallet.goOnline(false, this.indexerUrl);
     } catch (error) {
       throw new WalletError('Failed to establish online connection', undefined, error as Error);
@@ -164,84 +188,78 @@ export class RGBLibClient {
   /**
    * Get online object, creating it if needed
    */
-  private async getOnline(): Promise<any> {
-    await this.ensureOnline();
+  private getOnline(): any {
+    this.ensureOnline();
     return this.online;
   }
 
-  async registerWallet(): Promise<{ address: string; btc_balance: BtcBalance }> {
-    const online = await this.getOnline();
+  registerWallet(): { address: string; btcBalance: BtcBalance } {
+    const online = this.getOnline();
     const address = this.wallet.getAddress();
-    const btcBalance = JSON.parse(this.wallet.getBtcBalance(online, false));
-    
+    const btcBalance = this.wallet.getBtcBalance(online, false);
     return {
       address,
-      btc_balance: btcBalance,
+      btcBalance,
     };
   }
 
-  async getBtcBalance(): Promise<BtcBalance> {
-    const online = await this.getOnline();
-    return JSON.parse(this.wallet.getBtcBalance(online, false));
+  getBtcBalance(): BtcBalance {
+    const online = this.getOnline();
+    return this.wallet.getBtcBalance(online, false);
   }
 
-  async getAddress(): Promise<string> {
+  getAddress(): string {
     return this.wallet.getAddress();
   }
 
-  async listUnspents(): Promise<Unspent[]> {
-    const online = await this.getOnline();
-    return JSON.parse(this.wallet.listUnspents(online, false, false));
+  listUnspents(): Unspent[] {
+    const online = this.getOnline();
+    return this.wallet.listUnspents(online, false, false);
   }
 
-  async createUtxosBegin(params: CreateUtxosBeginRequestModel): Promise<string> {
-    const online = await this.getOnline();
-    const upTo = params.up_to ?? false;
-    const num = params.num;
-    const size = params.size;
-    const feeRate = params.fee_rate ? String(params.fee_rate) : '1';
+  createUtxosBegin(params: CreateUtxosBeginRequestModel): string {
+    const online = this.getOnline();
+    const upTo = params.upTo ?? false;
+    const num = params.num !== undefined ? String(params.num) : null;
+    const size = params.size !== undefined ? String(params.size) : null;
+    const feeRate = params.feeRate ? String(params.feeRate) : '1';
     const skipSync = false;
 
-    const psbt = this.wallet.createUtxos(online, upTo, num, size, feeRate, skipSync);
-    return psbt;
+    return this.wallet.createUtxosBegin(online, upTo, num, size, feeRate, skipSync);
   }
 
-  async createUtxosEnd(params: CreateUtxosEndRequestModel): Promise<number> {
-    try {
-      return 1;
-    } catch (error) {
-      throw new WalletError('Failed to process createUtxosEnd', undefined, error as Error);
-    }
+  createUtxosEnd(params: CreateUtxosEndRequestModel): number {
+    const online = this.getOnline();
+    const signedPsbt = params.signedPsbt;
+    const skipSync = params.skipSync ?? false;
+
+    return this.wallet.createUtxosEnd(online, signedPsbt, skipSync);
   }
 
-  async sendBegin(params: SendAssetBeginRequestModel): Promise<string> {
-    const online = await this.getOnline();
+  sendBegin(params: SendAssetBeginRequestModel): string {
+    const online = this.getOnline();
+    console.log('sendBegin params', params);
     
-    const feeRate = params.fee_rate ? String(params.fee_rate) : '1';
-    const minConfirmations = params.min_confirmations ?? 1;
-    const skipSync = false;
+    const feeRate = String(params.feeRate ?? 1);
+    const minConfirmations = String(params.minConfirmations ?? 1);
     const donation = false;
 
-    let assetId: string | undefined = params.asset_id;
+    let assetId: string | undefined = params.assetId;
     let amount: number | undefined = params.amount;
     let recipientId: string | undefined;
     let transportEndpoints: string[] = [];
-
+    let witnessData: { amountSat: string, blinding?: number | null } | null = null;
+    if (params.witnessData && params.witnessData.amountSat) {
+      witnessData = {
+        amountSat: String(params.witnessData.amountSat),
+        blinding: params.witnessData.blinding ? Number(params.witnessData.blinding) : null,
+      };
+    }
     if (params.invoice) {
       const invoiceStr = params.invoice;
-      
-      if (invoiceStr.startsWith('rgb:')) {
-        recipientId = invoiceStr;
-      } else {
-        try {
-          const parsed = JSON.parse(invoiceStr);
-          recipientId = parsed.recipient_id || invoiceStr;
-          transportEndpoints = parsed.transport_endpoints || [];
-          assetId = parsed.asset_id || assetId;
-        } catch {
-          recipientId = invoiceStr;
-        }
-      }
+      const invoiceData = this.decodeRGBInvoice({ invoice: invoiceStr });
+      recipientId = invoiceData.recipientId;
+      transportEndpoints = invoiceData.transportEndpoints;
     }
 
     if (transportEndpoints.length === 0) {
@@ -256,79 +274,61 @@ export class RGBLibClient {
       throw new ValidationError('Could not extract recipient_id from invoice', 'invoice');
     }
 
-    if (!amount && params.witness_data?.amount_sat) {
-      amount = params.witness_data.amount_sat;
-    }
-
     if (!amount) {
       throw new ValidationError('amount is required for send operation', 'amount');
     }
 
+    const assignment = { Fungible: amount };
     const recipientMap: Record<string, any[]> = {
       [assetId]: [{
-        recipient_id: recipientId,
-        amount: String(amount),
-        transport_endpoints: transportEndpoints,
+        recipientId: recipientId,
+        witnessData: witnessData,
+        assignment: assignment,
+        transportEndpoints: transportEndpoints,
       }],
     };
-
-    const result = this.wallet.send(
+    const psbt = this.wallet.sendBegin(
       online,
       recipientMap,
       donation,
       feeRate,
-      minConfirmations,
-      skipSync
+      minConfirmations
     );
 
-    if (typeof result === 'string') {
-      if (result.startsWith('cHNidP8') || result.length > 100) {
-        return result;
-      }
-      
-      try {
-        const parsedResult = JSON.parse(result);
-        return parsedResult.psbt || 
-               parsedResult.unsigned_psbt || 
-               parsedResult.unsignedPsbt ||
-               parsedResult.psbt_base64 ||
-               result;
-      } catch {
-        return result;
-      }
-    }
-    
-    return typeof result === 'object' ? JSON.stringify(result) : String(result);
-  }
-
-  async sendEnd(params: SendAssetEndRequestModel): Promise<SendResult> {
-    return {
-      txid: '',
-      batch_transfer_idx: 0,
-    };
-  }
-
-  async sendBtcBegin(params: SendBtcBeginRequestModel): Promise<string> {
-    const online = await this.getOnline();
-    const address = params.address;
-    const amount = String(params.amount);
-    const feeRate = String(params.fee_rate);
-    const skipSync = params.skip_sync ?? false;
-
-    const psbt = this.wallet.sendBtc(online, address, amount, feeRate, skipSync);
     return psbt;
   }
 
-  async sendBtcEnd(params: SendBtcEndRequestModel): Promise<string> {
-    return params.signed_psbt;
+  sendEnd(params: SendAssetEndRequestModel): SendResult {
+    const online = this.getOnline();
+    const signedPsbt = params.signedPsbt;
+    const skipSync = params.skipSync ?? false;
+
+    return this.wallet.sendEnd(online, signedPsbt, skipSync);
   }
 
-  async getFeeEstimation(params: GetFeeEstimationRequestModel): Promise<GetFeeEstimationResponse> {
-    const online = await this.getOnline();
-    const blocks = params.blocks;
-    
+  sendBtcBegin(params: SendBtcBeginRequestModel): string {
+    const online = this.getOnline();
+    const address = params.address;
+    const amount = String(params.amount);
+    const feeRate = String(params.feeRate);
+    const skipSync = params.skipSync ?? false;
+
+    return this.wallet.sendBtcBegin(online, address, amount, feeRate, skipSync);
+  }
+
+  sendBtcEnd(params: SendBtcEndRequestModel): string {
+    const online = this.getOnline();
+    const signedPsbt = params.signedPsbt;
+    const skipSync = params.skipSync ?? false;
+
+    return this.wallet.sendBtcEnd(online, signedPsbt, skipSync);
+  }
+
+  getFeeEstimation(params: GetFeeEstimationRequestModel): GetFeeEstimationResponse {
+    const online = this.getOnline();
+    const blocks = String(params.blocks);
+    try {
     const result = this.wallet.getFeeEstimation(online, blocks);
-    
     if (typeof result === 'string') {
       try {
         return JSON.parse(result);
@@ -336,84 +336,94 @@ export class RGBLibClient {
         return result as unknown as GetFeeEstimationResponse;
       }
     }
-    
     return result;
+    }catch(error) {
+      console.warn('rgb-lib estimation fee are not available, using default fee rate 4');
+     return 4 as GetFeeEstimationResponse; // return default fee rate 4 when lib estimation fee error
+    }
+    
+   
   }
 
-  async blindReceive(params: InvoiceRequest): Promise<InvoiceReceiveData> {
-    const assetId = params.asset_id || null;
-    const assignment = String(params.amount);
-    const durationSeconds = undefined;
+  blindReceive(params: InvoiceRequest): InvoiceReceiveData {
+    const assetId = params.assetId || null;
+    const assignment = `{"Fungible":${params.amount}}`;
+    const durationSeconds = String(params.durationSeconds ?? 2000);
     const transportEndpoints: string[] = [this.transportEndpoint];
-    const minConfirmations = 1;
+    const minConfirmations = String(params.minConfirmations ?? 3);
 
-    const result = this.wallet.blindReceive(
+    return this.wallet.blindReceive(
       assetId,
       assignment,
       durationSeconds,
       transportEndpoints,
       minConfirmations
     );
-
-    return JSON.parse(result);
   }
 
-  async witnessReceive(params: InvoiceRequest): Promise<InvoiceReceiveData> {
-    const assetId = params.asset_id || null;
-    const assignment = String(params.amount);
-    const durationSeconds = undefined;
+  witnessReceive(params: InvoiceRequest): InvoiceReceiveData {
+    const assetId = params.assetId || null;
+    const assignment = `{"Fungible":${params.amount}}`;
+    const durationSeconds = String(params.durationSeconds ?? 2000);
     const transportEndpoints: string[] = [this.transportEndpoint];
-    const minConfirmations = 1;
+    const minConfirmations = String(params.minConfirmations ?? 3);
 
-    const result = this.wallet.witnessReceive(
+    return this.wallet.witnessReceive(
       assetId,
       assignment,
       durationSeconds,
       transportEndpoints,
       minConfirmations
     );
-
-    return JSON.parse(result);
   }
 
-  async getAssetBalance(asset_id: string): Promise<AssetBalanceResponse> {
-    return JSON.parse(this.wallet.getAssetBalance(asset_id));
+  getAssetBalance(asset_id: string): AssetBalanceResponse {
+    return this.wallet.getAssetBalance(asset_id);
   }
 
-  async issueAssetNia(params: { ticker: string; name: string; amounts: number[]; precision: number }): Promise<AssetNIA> {
+  issueAssetNia(params: { ticker: string; name: string; amounts: number[]; precision: number }): AssetNIA {
     const ticker = params.ticker;
     const name = params.name;
-    const precision = params.precision;
+    const precision = String(params.precision);
     const amounts = params.amounts.map(a => String(a));
 
-    const result = this.wallet.issueAssetNIA(ticker, name, precision, amounts);
-    return JSON.parse(result);
+    return this.wallet.issueAssetNIA(ticker, name, precision, amounts);
   }
 
-  async issueAssetIfa(params: IssueAssetIfaRequestModel): Promise<AssetIfa> {
+  issueAssetIfa(params: IssueAssetIfaRequestModel): AssetIfa {
     throw new ValidationError('issueAssetIfa is not fully supported in rgb-lib. Use RGB Node server for IFA assets.', 'asset');
   }
 
-  async inflateBegin(params: InflateAssetIfaRequestModel): Promise<string> {
+  inflateBegin(params: InflateAssetIfaRequestModel): string {
     throw new ValidationError('inflateBegin is not fully supported in rgb-lib. Use RGB Node server for inflation operations.', 'asset');
   }
 
-  async inflateEnd(params: InflateEndRequestModel): Promise<OperationResult> {
+  inflateEnd(params: InflateEndRequestModel): OperationResult {
     throw new ValidationError('inflateEnd is not fully supported in rgb-lib. Use RGB Node server for inflation operations.', 'asset');
   }
 
-  async listAssets(): Promise<ListAssetsResponse> {
+  listAssets(): ListAssetsResponse {
     const filterAssetSchemas: string[] = [];
-    const result = this.wallet.listAssets(filterAssetSchemas);
-    return JSON.parse(result);
+    return this.wallet.listAssets(filterAssetSchemas);
   }
 
-  async decodeRGBInvoice(params: { invoice: string }): Promise<DecodeRgbInvoiceResponse> {
-    throw new ValidationError('decodeRGBInvoice is not directly supported in rgb-lib. Use RGB Node server for invoice decoding.', 'invoice');
+   decodeRGBInvoice(params: { invoice: string }): DecodeRgbInvoiceResponse{
+    const invoiceString = params.invoice;
+    
+    // Create Invoice instance from rgb-lib
+    const invoice = new rgblib.Invoice(invoiceString);
+    
+    try {
+      // Get decoded invoice data (already in camelCase from rgb-lib)
+      return invoice.invoiceData();
+    } finally {
+      // Clean up invoice resource
+      invoice.drop();
+    }
   }
 
-  async refreshWallet(): Promise<void> {
-    const online = await this.getOnline();
+  refreshWallet(): void {
+    const online = this.getOnline();
     const assetId = null;
     const filter: string[] = [];
     const skipSync = false;
@@ -421,9 +431,9 @@ export class RGBLibClient {
     this.wallet.refresh(online, assetId, filter, skipSync);
   }
 
-  async dropWallet(): Promise<void> {
+  dropWallet(): void {
     if (this.online) {
-      rgbLib.dropOnline(this.online);
+      rgblib.dropOnline(this.online);
       this.online = null;
     }
     if (this.wallet) {
@@ -432,82 +442,68 @@ export class RGBLibClient {
     }
   }
 
-  async listTransactions(): Promise<Transaction[]> {
-    const online = await this.getOnline();
+  listTransactions(): Transaction[] {
+    const online = this.getOnline();
     const skipSync = false;
-    return JSON.parse(this.wallet.listTransactions(online, skipSync));
+    return this.wallet.listTransactions(online, skipSync);
   }
 
-  async listTransfers(asset_id: string): Promise<RgbTransfer[]> {
-    return JSON.parse(this.wallet.listTransfers(asset_id));
+  listTransfers(asset_id?: string): RgbTransfer[] {
+    return this.wallet.listTransfers(asset_id?asset_id:null);
   }
 
-  async failTransfers(params: FailTransfersRequest): Promise<boolean> {
-    throw new ValidationError('failTransfers is not directly supported in rgb-lib. Use RGB Node server for this operation.', 'transfers');
+  failTransfers(params: FailTransfersRequest): boolean {
+    const online = this.getOnline();
+    const batchTransferIdx = params.batchTransferIdx !== undefined ? params.batchTransferIdx : null;
+    const noAssetOnly = params.noAssetOnly ?? false;
+    const skipSync = params.skipSync ?? false;
+
+    return this.wallet.failTransfers(online, batchTransferIdx, noAssetOnly, skipSync);
   }
 
-  async syncWallet(): Promise<void> {
-    const online = await this.getOnline();
+  deleteTransfers(params: { batchTransferIdx?: number; noAssetOnly?: boolean }): boolean {
+    const batchTransferIdx = params.batchTransferIdx !== undefined ? params.batchTransferIdx : null;
+    const noAssetOnly = params.noAssetOnly ?? false;
+
+    return this.wallet.deleteTransfers(batchTransferIdx, noAssetOnly);
+  }
+
+  syncWallet(): void {
+    const online = this.getOnline();
     this.wallet.sync(online);
   }
 
-  async createBackup(params: { password: string }): Promise<WalletBackupResponse> {
-    const backupPath = path.join(this.dataDir, `backup-${Date.now()}.zip`);
-    this.wallet.backup(backupPath, params.password);
+  createBackup(params: {backupPath:string, password: string }): WalletBackupResponse {
+   
+    if(!params.backupPath) {
+      throw new ValidationError('backupPath is required', 'backupPath');
+    }
+    if(!params.password) {
+      throw new ValidationError('password is required', 'password');
+    }
     
-    const backupInfo = this.wallet.backupInfo();
+    if (!fs.existsSync(params.backupPath)) {
+      throw new ValidationError(`Backup directory does not exist: ${params.backupPath}`, 'backupPath');
+    }
     
+    const fullBackupPath = path.join(params.backupPath, `${this.masterFingerprint}.backup`);
+    this.wallet.backup(fullBackupPath, params.password);
+        
     return {
       message: 'Backup created successfully',
-      download_url: backupPath,
+      backupPath: fullBackupPath,
     };
   }
 
-  async downloadBackup(backupId?: string): Promise<ArrayBuffer | Buffer> {
-    const backupPath = backupId || path.join(this.dataDir, `backup-${this.xpubVan}.zip`);
+  // downloadBackup(backupId?: string): ArrayBuffer | Buffer {
+  //   const backupPath = backupId || path.join(this.dataDir, `${this.masterFingerprint}.backup`);
     
-    if (!fs.existsSync(backupPath)) {
-      throw new ValidationError('Backup file not found', 'backup');
-    }
+  //   if (!fs.existsSync(backupPath)) {
+  //     throw new ValidationError('Backup file not found', 'backup');
+  //   }
 
-    return fs.readFileSync(backupPath);
-  }
-
-  async restoreWallet(params: {
-    file: Buffer | Uint8Array | ArrayBuffer | Readable;
-    password: string;
-    xpub_van?: string;
-    xpub_col?: string;
-    master_fingerprint?: string;
-    filename?: string;
-  }): Promise<WalletRestoreResponse> {
-    let fileBuffer: Buffer;
-    if (params.file instanceof Buffer) {
-      fileBuffer = params.file;
-    } else if (params.file instanceof Uint8Array) {
-      fileBuffer = Buffer.from(params.file);
-    } else if (params.file instanceof ArrayBuffer) {
-      fileBuffer = Buffer.from(params.file);
-    } else {
-      const chunks: Buffer[] = [];
-      for await (const chunk of params.file) {
-        chunks.push(Buffer.from(chunk));
-      }
-      fileBuffer = Buffer.concat(chunks);
-    }
-
-    const tempBackupPath = path.join(os.tmpdir(), `restore-${Date.now()}.zip`);
-    fs.writeFileSync(tempBackupPath, fileBuffer);
-
-    const targetDir = this.dataDir;
-    rgbLib.restoreBackup(tempBackupPath, params.password, targetDir);
-
-    fs.unlinkSync(tempBackupPath);
-
-    return {
-      message: 'Wallet restored successfully',
-    };
-  }
+  //   return fs.readFileSync(backupPath);
+  // }
 
   /**
    * Cleanup resources

@@ -1,18 +1,7 @@
 /**
  * Client module exports
  * 
- * This module contains HTTP client and RGB API client classes
+ * This module contains RGB Lib client
  */
 
-// Re-export RGB client class explicitly
-export { RGBClient } from './rgb-client';
-
-// Export RGB Lib client (local implementation)
-export { RGBLibClient } from './rgb-lib-client';
-
-// Export HTTP client factory
-export { createClient } from './http-client';
-
-// Backward compatibility - export ThunderLink as alias to RGBClient
-export { RGBClient as ThunderLink } from './rgb-client';
-
+export { RGBLibClient, generateKeys, restoreWallet, type RgbLibGeneratedKeys } from './rgb-lib-client';

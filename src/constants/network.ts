@@ -23,11 +23,13 @@ export const NETWORK_MAP = {
   'signet': 'signet' as const,
   'mainnet': 'mainnet' as const,
   'testnet': 'testnet' as const,
+  'testnet4': 'testnet4' as const,
   'regtest': 'regtest' as const,
 } as const;
 
 /**
  * BIP32 network version constants
+ * Note: testnet4 uses the same versions as testnet
  */
 export const BIP32_VERSIONS = {
   mainnet: {
@@ -35,6 +37,10 @@ export const BIP32_VERSIONS = {
     private: 0x0488ade4,
   },
   testnet: {
+    public: 0x043587cf,
+    private: 0x04358394,
+  },
+  testnet4: {
     public: 0x043587cf,
     private: 0x04358394,
   },
