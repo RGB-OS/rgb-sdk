@@ -84,6 +84,24 @@ This pattern enables advanced use cases, such as:
 
 This SDK uses `rgb-lib` directly and does not require an RGB Node server. All operations are performed locally.
 
+### Default Endpoints
+
+The SDK uses default endpoints for RGB transport and Bitcoin indexing. These are automatically used if not specified:
+
+**Transport Endpoint** (RGB protocol communication):
+
+- Default: `rpcs://proxy.iriswallet.com/0.2/json-rpc`
+
+**Indexer URLs** (Bitcoin blockchain data):
+
+- **Mainnet**: `ssl://electrum.iriswallet.com:50003`
+- **Testnet**: `ssl://electrum.iriswallet.com:50013`
+- **Testnet4**: `ssl://electrum.iriswallet.com:50053`
+- **Signet**: `tcp://46.224.75.237:50001`
+- **Regtest**: `tcp://regtest.thunderstack.org:50001`
+
+These defaults can be overridden by providing `transportEndpoint` and `indexerUrl` parameters when initializing `WalletManager`.
+
 ### Installation
 
 ```bash
