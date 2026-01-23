@@ -1,5 +1,5 @@
 {
-  "name": "rgb-sdk",
+  "name": "@utexo/rgb-sdk",
   "version": "1.2.7",
   "devDependencies": {
     "@types/jest": "^30.0.0",
