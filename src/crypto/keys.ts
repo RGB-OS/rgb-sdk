@@ -76,9 +76,9 @@ export function normalizeSeedInput(seed: SeedInput, field: string = 'seed'): Uin
 export interface GeneratedKeys {
   mnemonic: string;
   xpub: string;
-  account_xpub_vanilla: string;
-  account_xpub_colored: string;
-  master_fingerprint: string;
+  accountXpubVanilla: string;
+  accountXpubColored: string;
+  masterFingerprint: string;
   xpriv: string;
 }
 
@@ -186,9 +186,9 @@ async function buildGeneratedKeysFromRoot(
   return {
     mnemonic,
     xpub,
-    account_xpub_vanilla,
-    account_xpub_colored,
-    master_fingerprint,
+    accountXpubVanilla: account_xpub_vanilla,
+    accountXpubColored: account_xpub_colored,
+    masterFingerprint: master_fingerprint,
     xpriv,
   };
 }
@@ -204,7 +204,7 @@ async function getXpubFromXprivInternal(xpriv: string, bitcoinNetwork?: string |
     // BIP32Factory is a factory function that returns BIP32 interface
     // Use it to create a BIP32 instance from the xpriv
     const bip32 = factory(ecc);
-    
+
     // fromBase58 requires network versions for validation
     // If network is not provided, try to infer from xpriv prefix (xprv/tprv for mainnet/testnet)
     let node;
@@ -218,7 +218,7 @@ async function getXpubFromXprivInternal(xpriv: string, bitcoinNetwork?: string |
       const versions = getNetworkVersions(inferredNetwork);
       node = bip32.fromBase58(xpriv, versions);
     }
-    
+
     return node.neutered().toBase58();
   } catch (error) {
     throw new CryptoError('Failed to derive xpub from xpriv', error as Error);
@@ -259,12 +259,12 @@ async function buildKeysOutputFromXpriv(xpriv: string, bitcoinNetwork: string | 
   try {
     // BIP32Factory is a factory function that returns BIP32 interface
     const bip32 = factory(ecc);
-    
+
     // Get network versions for validation
     const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
     const versions = getNetworkVersions(bitcoinNetwork);
     const root = bip32.fromBase58(xpriv, versions);
-    
+
     return buildGeneratedKeysFromRoot(root, normalizedNetwork, '');
   } catch (error) {
     throw new CryptoError('Failed to derive keys from xpriv', error as Error);
@@ -329,16 +329,16 @@ export async function deriveKeysFromMnemonic(
   mnemonic: string
 ): Promise<GeneratedKeys> {
   validateMnemonic(mnemonic, 'mnemonic');
-  
+
   const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
-  
+
   try {
     const { bip39 } = await ensureBaseDependencies();
     const trimmedMnemonic = mnemonic.trim();
     if (!bip39 || !bip39.validateMnemonic(trimmedMnemonic)) {
       throw new ValidationError('Invalid mnemonic format - failed BIP39 validation', 'mnemonic');
     }
-    
+
     return await buildKeysOutput(trimmedMnemonic, normalizedNetwork);
   } catch (error) {
     if (error instanceof ValidationError) {
@@ -417,7 +417,7 @@ export async function getXprivFromMnemonic(
 ): Promise<string> {
   validateMnemonic(mnemonic, 'mnemonic');
   const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
-  
+
   try {
     return await getMasterXpriv(mnemonic, normalizedNetwork);
   } catch (error) {
@@ -445,7 +445,7 @@ export async function getXpubFromXpriv(xpriv: string, bitcoinNetwork?: string | 
   if (!xpriv || typeof xpriv !== 'string') {
     throw new ValidationError('xpriv must be a non-empty string', 'xpriv');
   }
-  
+
   try {
     return await getXpubFromXprivInternal(xpriv, bitcoinNetwork);
   } catch (error) {
@@ -480,9 +480,9 @@ export async function deriveKeysFromXpriv(
   if (!xpriv || typeof xpriv !== 'string') {
     throw new ValidationError('xpriv must be a non-empty string', 'xpriv');
   }
-  
+
   const normalizedNetwork = normalizeNetwork(bitcoinNetwork);
-  
+
   try {
     return await buildKeysOutputFromXpriv(xpriv, normalizedNetwork);
   } catch (error) {
@@ -498,7 +498,7 @@ export async function accountXpubsFromMnemonic(
   mnemonic: string
 ): Promise<AccountXpubs> {
   validateMnemonic(mnemonic, 'mnemonic');
-  
+
   try {
     const { bip39 } = await ensureBaseDependencies();
     if (!bip39 || !bip39.validateMnemonic(mnemonic)) {

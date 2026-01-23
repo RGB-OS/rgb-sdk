@@ -4,7 +4,7 @@ import type { Network, NetworkVersions, BufferLike } from '../crypto/types';
 import { BIP32_VERSIONS } from '../constants/network';
 
 function getWifVersion(network: Network): number {
-  return network === 'mainnet' ? 0x80 : 0xef;
+  return network === 'mainnet' ? 0x80 : 0xef; // testnet, testnet4, signet, and regtest all use 0xef
 }
 
 function getNetworkVersionsFromConstants(network: Network): NetworkVersions {
@@ -68,6 +68,7 @@ export function toNetworkName(bitcoinNetwork: string | number): Network {
   if (n.includes('main')) return 'mainnet';
   if (n.includes('reg')) return 'regtest';
   if (n.includes('sig')) return 'signet';
+  if (n.includes('testnet4')) return 'testnet4';
   return 'testnet';
 }
 

@@ -1,4 +1,4 @@
-import { RGBClient } from '../client/index';
+import { RGBLibClient, restoreWallet } from '../client/index';
 import {
   CreateUtxosBeginRequestModel,
   CreateUtxosEndRequestModel,
@@ -36,34 +36,69 @@ import { generateKeys } from '../crypto';
 import { normalizeNetwork } from '../utils/validation';
 import { ValidationError, WalletError, CryptoError } from '../errors';
 import type { Readable } from 'stream';
+import path from 'path';
+import * as os from 'os';
+// import { generateKeys } from '../client/rgb-lib-client';
 
+/**
+ * Restore wallet from backup
+ * This should be called before creating a WalletManager instance
+ * @param params - Restore parameters including backup file path, password, and restore directory
+ * @returns Wallet restore response
+ */
+export const restoreFromBackup = (params: RestoreWalletRequestModel): WalletRestoreResponse => {
+  const {
+    backupFilePath,
+    password,
+    dataDir,
+  } = params;
+
+  if (!backupFilePath) {
+    throw new ValidationError('backup file is required', 'backup');
+  }
+  if (!password) {
+    throw new ValidationError('password is required', 'password');
+  }
+  if (!dataDir) {
+    throw new ValidationError('restore directory is required', 'restoreDir');
+  }
+
+  return restoreWallet({
+    backupFilePath,
+    password,
+    dataDir,
+  });
+};
 
 /**
  * Generate a new wallet with keys
  * @param network - Network string (default: 'regtest')
  * @returns Generated keys including mnemonic, xpubs, and master fingerprint
  */
-export const createWallet = async (network: string | number = 'regtest') => {
+export const createWallet =  async (network: string = 'regtest') => {
+  // return await generateKeys(network);
   return await generateKeys(network);
 }
 
 export type WalletInitParams = {
- 
-  xpub_van: string;
-  xpub_col: string;
-  rgb_node_endpoint: string;
+
+  xpubVan: string;
+  xpubCol: string;
   mnemonic?: string;
   seed?: Uint8Array;
   network?: string | number;
   xpub?: string;
-  master_fingerprint: string;
+  masterFingerprint: string;
+  transportEndpoint?: string;
+  indexerUrl?: string;
+  dataDir?: string;
 }
 
 /**
  * Wallet Manager - High-level wallet interface combining RGB API client and cryptographic operations
  * 
  * This class provides a unified interface for:
- * - RGB Node API interactions (via RGBClient)
+ * - RGB operations (via RGBLibClient - local rgb-lib)
  * - PSBT signing operations
  * - Wallet state management
  * 
@@ -71,70 +106,68 @@ export type WalletInitParams = {
  * ```typescript
  * const keys = await createWallet('testnet');
  * const wallet = new WalletManager({
- *   xpub_van: keys.account_xpub_vanilla,
- *   xpub_col: keys.account_xpub_colored,
+ *   xpubVan: keys.account_xpub_vanilla,
+ *   xpubCol: keys.account_xpub_colored,
  *   rgb_node_endpoint: 'http://127.0.0.1:8000',
  *   mnemonic: keys.mnemonic,
  *   network: 'testnet',
- *   master_fingerprint: keys.master_fingerprint
+ *   masterFingerprint: keys.master_fingerprint
  * });
  * 
  * const balance = await wallet.getBtcBalance();
  * ```
  */
 export class WalletManager {
-  private readonly client: RGBClient;
+  private readonly client: RGBLibClient;
   private readonly xpub: string | null;
-  private readonly xpub_van: string;
-  private readonly xpub_col: string;
+  private readonly xpubVan: string;
+  private readonly xpubCol: string;
   private mnemonic: string | null;
   private seed: Uint8Array | null;
   private readonly network: Network;
   private readonly masterFingerprint: string;
   private disposed: boolean = false;
-
+  private readonly dataDir: string;
   constructor(params: WalletInitParams) {
-    // Validate required parameters
-    if (!params.xpub_van) {
-      throw new ValidationError('xpub_van is required', 'xpub_van');
+    if (!params.xpubVan) {
+      throw new ValidationError('xpubVan is required', 'xpubVan');
     }
-    if (!params.xpub_col) {
-      throw new ValidationError('xpub_col is required', 'xpub_col');
+    if (!params.xpubCol) {
+      throw new ValidationError('xpubCol is required', 'xpubCol');
     }
-    if (!params.rgb_node_endpoint) {
-      throw new ValidationError('rgb_node_endpoint is required', 'rgb_node_endpoint');
-    }
-    if (!params.master_fingerprint) {
-      throw new ValidationError('master_fingerprint is required', 'master_fingerprint');
+    if (!params.masterFingerprint) {
+      throw new ValidationError('masterFingerprint is required', 'masterFingerprint');
     }
 
-    // Initialize RGB client
-    this.client = new RGBClient({
-      xpub_van: params.xpub_van,
-      xpub_col: params.xpub_col,
-      rgbEndpoint: params.rgb_node_endpoint,
-      master_fingerprint: params.master_fingerprint,
-    });
+    this.network = normalizeNetwork(params.network ?? 'regtest');
 
-    // Store wallet state
-    this.xpub_van = params.xpub_van;
-    this.xpub_col = params.xpub_col;
+
+    this.xpubVan = params.xpubVan;
+    this.xpubCol = params.xpubCol;
     this.seed = params.seed ?? null;
     this.mnemonic = params.mnemonic ?? null;
     this.xpub = params.xpub ?? null;
-    this.masterFingerprint = params.master_fingerprint;
+    this.masterFingerprint = params.masterFingerprint;
+    this.dataDir = params.dataDir ?? path.join(os.tmpdir(), 'rgb-wallet', this.masterFingerprint);
 
-    // Normalize network using utility function
-    this.network = normalizeNetwork(params.network ?? 'regtest');
+    this.client = new RGBLibClient({
+      xpubVan: params.xpubVan,
+      xpubCol: params.xpubCol,
+      masterFingerprint: params.masterFingerprint,
+      network: this.network,
+      transportEndpoint: params.transportEndpoint,
+      indexerUrl: params.indexerUrl,
+      dataDir: params.dataDir ?? this.dataDir,
+    });
   }
 
   /**
    * Get wallet's extended public keys
    */
-  public getXpub(): { xpub_van: string; xpub_col: string } {
+  public getXpub(): { xpubVan: string; xpubCol: string } {
     return {
-      xpub_van: this.xpub_van,
-      xpub_col: this.xpub_col
+      xpubVan: this.xpubVan,
+      xpubCol: this.xpubCol
     };
   }
 
@@ -154,7 +187,7 @@ export class WalletManager {
     if (this.disposed) {
       return;
     }
-
+    
     if (this.mnemonic !== null) {
       this.mnemonic = null;
     }
@@ -163,6 +196,7 @@ export class WalletManager {
       this.seed.fill(0);
       this.seed = null;
     }
+    this.client.dropWallet();
 
     this.disposed = true;
   }
@@ -184,57 +218,55 @@ export class WalletManager {
     }
   }
 
-  // ========== RGB API Methods (delegated to RGBClient) ==========
-
-  public async registerWallet(): Promise<{ address: string; btc_balance: BtcBalance }> {
+  public registerWallet(): { address: string; btcBalance: BtcBalance } {
     return this.client.registerWallet();
   }
 
-  public async getBtcBalance(): Promise<BtcBalance> {
+  public getBtcBalance(): BtcBalance {
     return this.client.getBtcBalance();
   }
 
-  public async getAddress(): Promise<string> {
+  public getAddress(): string {
     return this.client.getAddress();
   }
 
-  public async listUnspents(): Promise<Unspent[]> {
+  public listUnspents(): Unspent[] {
     return this.client.listUnspents();
   }
 
-  public async listAssets(): Promise<ListAssetsResponse> {
+  public listAssets(): ListAssetsResponse {
     return this.client.listAssets();
   }
 
-  public async getAssetBalance(asset_id: string): Promise<AssetBalanceResponse> {
+  public getAssetBalance(asset_id: string): AssetBalanceResponse {
     return this.client.getAssetBalance(asset_id);
   }
 
-  public async createUtxosBegin(params: CreateUtxosBeginRequestModel): Promise<string> {
+  public createUtxosBegin(params: CreateUtxosBeginRequestModel): string {
     return this.client.createUtxosBegin(params);
   }
 
-  public async createUtxosEnd(params: CreateUtxosEndRequestModel): Promise<number> {
+  public createUtxosEnd(params: CreateUtxosEndRequestModel): number {
     return this.client.createUtxosEnd(params);
   }
 
-  public async sendBegin(params: SendAssetBeginRequestModel): Promise<string> {
+  public sendBegin(params: SendAssetBeginRequestModel): string {
     return this.client.sendBegin(params);
   }
 
-  public async sendEnd(params: SendAssetEndRequestModel): Promise<SendResult> {
+  public sendEnd(params: SendAssetEndRequestModel): SendResult {
     return this.client.sendEnd(params);
   }
 
-  public async sendBtcBegin(params: SendBtcBeginRequestModel): Promise<string> {
+  public sendBtcBegin(params: SendBtcBeginRequestModel): string {
     return this.client.sendBtcBegin(params);
   }
 
-  public async sendBtcEnd(params: SendBtcEndRequestModel): Promise<string> {
+  public sendBtcEnd(params: SendBtcEndRequestModel): string {
     return this.client.sendBtcEnd(params);
   }
 
-  public async estimateFeeRate(blocks: number): Promise<GetFeeEstimationResponse> {
+  public estimateFeeRate(blocks: number): GetFeeEstimationResponse {
     if (!Number.isFinite(blocks)) {
       throw new ValidationError('blocks must be a finite number', 'blocks');
     }
@@ -251,32 +283,32 @@ export class WalletManager {
 
   public async sendBtc(params: SendBtcBeginRequestModel): Promise<string> {
     this.ensureNotDisposed();
-    const psbt = await this.sendBtcBegin(params);
+    const psbt = this.sendBtcBegin(params);
     const signed = await this.signPsbt(psbt);
-    return this.sendBtcEnd({ signed_psbt: signed });
+    return this.sendBtcEnd({ signedPsbt: signed });
   }
 
-  public async blindReceive(params: InvoiceRequest): Promise<InvoiceReceiveData> {
+  public blindReceive(params: InvoiceRequest): InvoiceReceiveData {
     return this.client.blindReceive(params);
   }
 
-  public async witnessReceive(params: InvoiceRequest): Promise<InvoiceReceiveData> {
+  public witnessReceive(params: InvoiceRequest): InvoiceReceiveData {
     return this.client.witnessReceive(params);
   }
 
-  public async issueAssetNia(params: IssueAssetNiaRequestModel): Promise<AssetNIA> {
+  public issueAssetNia(params: IssueAssetNiaRequestModel): AssetNIA {
     return this.client.issueAssetNia(params);
   }
 
-  public async issueAssetIfa(params: IssueAssetIfaRequestModel): Promise<AssetIfa> {
+  public issueAssetIfa(params: IssueAssetIfaRequestModel): AssetIfa {
     return this.client.issueAssetIfa(params);
   }
 
-  public async inflateBegin(params: InflateAssetIfaRequestModel): Promise<string> {
+  public inflateBegin(params: InflateAssetIfaRequestModel): string {
     return this.client.inflateBegin(params);
   }
 
-  public async inflateEnd(params: InflateEndRequestModel): Promise<OperationResult> {
+  public inflateEnd(params: InflateEndRequestModel): OperationResult {
     return this.client.inflateEnd(params);
   }
 
@@ -288,68 +320,34 @@ export class WalletManager {
   public async inflate(params: InflateAssetIfaRequestModel, mnemonic?: string): Promise<OperationResult> {
     this.ensureNotDisposed();
     const psbt = await this.inflateBegin(params);
-    const signed_psbt = await this.signPsbt(psbt, mnemonic);
+    const signedPsbt = await this.signPsbt(psbt, mnemonic);
     return await this.inflateEnd({
-      signed_psbt
+      signedPsbt
     });
   }
 
-  public async refreshWallet(): Promise<void> {
-    return this.client.refreshWallet();
+  public refreshWallet(): void {
+    this.client.refreshWallet();
   }
 
-  public async listTransactions(): Promise<Transaction[]> {
+  public listTransactions(): Transaction[] {
     return this.client.listTransactions();
   }
 
-  public async listTransfers(asset_id: string): Promise<RgbTransfer[]> {
+  public listTransfers(asset_id?: string): RgbTransfer[] {
     return this.client.listTransfers(asset_id);
   }
 
-  public async failTransfers(params: FailTransfersRequest): Promise<boolean> {
+  public failTransfers(params: FailTransfersRequest): boolean {
     return this.client.failTransfers(params);
   }
 
-  public async decodeRGBInvoice(params: { invoice: string }): Promise<DecodeRgbInvoiceResponse> {
+  public decodeRGBInvoice(params: { invoice: string }): DecodeRgbInvoiceResponse {
     return this.client.decodeRGBInvoice(params);
   }
 
-  public async createBackup(password: string): Promise<WalletBackupResponse> {
-    if (!password) {
-      throw new ValidationError('password is required', 'password');
-    }
-    return this.client.createBackup({ password });
-  }
-
-  public async downloadBackup(backupId?: string): Promise<ArrayBuffer | Buffer> {
-    return this.client.downloadBackup(backupId ?? this.xpub_van);
-  }
-
-  public async restoreFromBackup(params: RestoreWalletRequestModel): Promise<WalletRestoreResponse> {
-    const {
-      backup,
-      password,
-      filename,
-      xpub_van = this.xpub_van,
-      xpub_col = this.xpub_col,
-      master_fingerprint = this.masterFingerprint
-    } = params;
-
-    if (!backup) {
-      throw new ValidationError('backup file is required', 'backup');
-    }
-    if (!password) {
-      throw new ValidationError('password is required', 'password');
-    }
-
-    return this.client.restoreWallet({
-      file: backup,
-      password,
-      filename,
-      xpub_van,
-      xpub_col,
-      master_fingerprint
-    });
+  public createBackup(params: { backupPath: string, password: string }): WalletBackupResponse {
+    return this.client.createBackup(params);
   }
 
   /**
@@ -379,20 +377,20 @@ export class WalletManager {
   public async send(invoiceTransfer: SendAssetBeginRequestModel, mnemonic?: string): Promise<SendResult> {
     this.ensureNotDisposed();
     const psbt = await this.sendBegin(invoiceTransfer);
-    const signed_psbt = await this.signPsbt(psbt, mnemonic);
-    console.log('send signed_psbt', signed_psbt);
-    return await this.sendEnd({ signed_psbt });
+    const signedPsbt = await this.signPsbt(psbt, mnemonic);
+    console.log('send signedPsbt', signedPsbt);
+    return await this.sendEnd({ signedPsbt });
   }
 
-  public async createUtxos({ up_to, num, size, fee_rate }: { up_to?: boolean, num?: number, size?: number, fee_rate?: number }): Promise<number> {
+  public async createUtxos({ upTo, num, size, feeRate }: { upTo?: boolean, num?: number, size?: number, feeRate?: number }): Promise<number> {
     this.ensureNotDisposed();
-    const psbt = await this.createUtxosBegin({ up_to, num, size, fee_rate });
-    const signed_psbt = await this.signPsbt(psbt);
-    return await this.createUtxosEnd({ signed_psbt });
+    const psbt = this.createUtxosBegin({ upTo, num, size, feeRate });
+    const signedPsbt = await this.signPsbt(psbt);
+    return this.createUtxosEnd({ signedPsbt });
   }
 
-  public async syncWallet(): Promise<void> {
-    return this.client.syncWallet();
+  public syncWallet(): void {
+    this.client.syncWallet();
   }
 
   public async signMessage(message: string): Promise<string> {
@@ -423,7 +421,7 @@ export class WalletManager {
     return verifySchnorrMessage({
       message,
       signature,
-      accountXpub: this.xpub_van,
+      accountXpub: this.xpubVan,
       network: this.network,
     });
   }
@@ -458,7 +456,7 @@ export const wallet = new Proxy({} as WalletManager, {
       throw new WalletError(
         'The legacy singleton wallet instance is deprecated. ' +
         'Please use `new WalletManager(params)` or `createWalletManager(params)` instead. ' +
-        'Example: const wallet = new WalletManager({ xpub_van, xpub_col, rgb_node_endpoint, master_fingerprint })'
+        'Example: const wallet = new WalletManager({ xpubVan, xpubCol, rgb_node_endpoint, masterFingerprint })'
       );
     }
     const value = (_wallet as any)[prop];

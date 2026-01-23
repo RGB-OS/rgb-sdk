@@ -1,21 +1,21 @@
 import type { Readable } from 'stream';
 
 export type RGBHTTPClientParams = {
-  xpub_van: string;
-  xpub_col: string;
-  master_fingerprint: string;
+  xpubVan: string;
+  xpubCol: string;
+  masterFingerprint: string;
   rgbEndpoint: string;
 }
 
 export interface FailTransfersRequest {
-  batch_transfer_idx: number
-  no_asset_only?: boolean
-  skip_sync?: boolean
+  batchTransferIdx?: number
+  noAssetOnly?: boolean
+  skipSync?: boolean
 }
 
 export interface WalletBackupResponse {
   message: string;
-  download_url: string;
+  backupPath: string;
 }
 
 export interface WalletRestoreResponse {
@@ -23,27 +23,26 @@ export interface WalletRestoreResponse {
 }
 
 export interface RestoreWalletRequestModel {
-  backup: Buffer | Uint8Array | ArrayBuffer | Readable;
+  backupFilePath: string;
   password: string;
-  filename?: string;
-  xpub_van?: string;
-  xpub_col?: string;
-  master_fingerprint?: string;
+  dataDir: string;
 }
 
 export interface WitnessData {
-  amount_sat: number;
+  amountSat: number;
   blinding?: number;
 }
 export interface InvoiceRequest {
   amount: number;
-  asset_id: string;
+  assetId: string;
+  minConfirmations?: number;
+  durationSeconds?: number;
 }
 export interface Recipient {
-  recipient_id: string;
-  witness_data?: WitnessData;
+  recipientId: string;
+  witnessData?: WitnessData;
   amount: number;
-  transport_endpoints: string[];
+  transportEndpoints: string[];
 }
 export interface IssueAssetNiaRequestModel { ticker: string; name: string; amounts: number[]; precision: number }
 
@@ -52,66 +51,68 @@ export interface IssueAssetIfaRequestModel {
   name: string;
   precision: number;
   amounts: number[];
-  inflation_amounts: number[];
-  replace_rights_num: number;
-  reject_list_url?: string;
+  inflationAmounts: number[];
+  replaceRightsNum: number;
+  rejectListUrl?: string;
 }
 export interface SendAssetBeginRequestModel {
   invoice: string;
-  witness_data?: WitnessData;
-  asset_id?: string;
+  witnessData?: WitnessData;
+  assetId?: string;
   amount?: number;
-  // recipient_map: Record<string, Recipient[]>;
+  // recipientMap: Record<string, Recipient[]>;
   // donation?: boolean;            // default: false
-  fee_rate?: number;             // default: 1
-  min_confirmations?: number;    // default: 1
+  feeRate?: number;             // default: 1
+  minConfirmations?: number;    // default: 1
 }
 
 export interface SendAssetEndRequestModel {
-  signed_psbt: string;
+  signedPsbt: string;
+  skipSync?: boolean;
 }
 
 export interface SendResult {
   txid: string;
-  batch_transfer_idx: number;
+  batchTransferIdx: number;
 }
 
 export interface OperationResult {
   txid: string;
-  batch_transfer_idx: number;
+  batchTransferIdx: number;
 }
 
 export interface CreateUtxosBeginRequestModel {
-  up_to?: boolean;
+  upTo?: boolean;
   num?: number;
   size?: number;
-  fee_rate?: number;
+  feeRate?: number;
 }
 
 export interface CreateUtxosEndRequestModel {
-  signed_psbt: string;
+  signedPsbt: string;
+  skipSync?: boolean;
 }
 
 export interface InflateAssetIfaRequestModel {
-  asset_id: string;
-  inflation_amounts: number[];
-  fee_rate?: number;
-  min_confirmations?: number;
+  assetId: string;
+  inflationAmounts: number[];
+  feeRate?: number;
+  minConfirmations?: number;
 }
 
 export interface InflateEndRequestModel {
-  signed_psbt: string;
+  signedPsbt: string;
 }
 
 export interface SendBtcBeginRequestModel {
   address: string;
   amount: number;
-  fee_rate: number;
-  skip_sync?: boolean;
+  feeRate: number;
+  skipSync?: boolean;
 }
 export interface SendBtcEndRequestModel {
-  signed_psbt: string;
-  skip_sync?: boolean;
+  signedPsbt: string;
+  skipSync?: boolean;
 }
 
 export interface GetFeeEstimationRequestModel {
@@ -133,12 +134,12 @@ export interface BlockTime {
 }
 
 export interface Transaction {
-  transaction_type: TransactionType;
+  transactionType: TransactionType;
   txid: string;
   received: number;
   sent: number;
   fee: number;
-  confirmation_time?: BlockTime;
+  confirmationTime?: BlockTime;
 }
 enum TransferKind {
     ISSUANCE = 0,
@@ -149,20 +150,20 @@ enum TransferKind {
   }
 export interface RgbTransfer {
   idx: number;
-  batch_transfer_idx: number;
-  created_at: number;
-  updated_at: number;
+  batchTransferIdx: number;
+  createdAt: number;
+  updatedAt: number;
   status: TransferStatus;
   amount: number;
   kind: TransferKind;
   txid: string | null;
-  recipient_id: string;
-  receive_utxo: { txid: string; vout: number };
-  change_utxo: { txid: string; vout: number } | null;
+  recipientId: string;
+  receiveUtxo: { txid: string; vout: number };
+  changeUtxo: { txid: string; vout: number } | null;
   expiration: number;
-  transport_endpoints: {
+  transportEndpoints: {
     endpoint: string;
-    transport_type: number;
+    transportType: number;
     used: boolean;
   }[];
 }
@@ -175,19 +176,19 @@ export enum TransferStatus {
 }
 export interface Unspent {
   utxo: Utxo;
-  rgb_allocations: RgbAllocation[];
+  rgbAllocations: RgbAllocation[];
 }
 export interface Utxo {
   outpoint: {
     txid: string;
     vout: number;
   };
-  btc_amount: number;
+  btcAmount: number;
   colorable: boolean;
 }
 
 export interface RgbAllocation {
-  asset_id: string;
+  assetId: string;
   amount: number;
   settled: boolean;
 }
@@ -204,9 +205,9 @@ export interface BtcBalance {
 }
 export interface InvoiceReceiveData {
   invoice: string
-  recipient_id: string
-  expiration_timestamp: number
-  batch_transfer_idx: number
+  recipientId: string
+  expirationTimestamp: number
+  batchTransferIdx: number
 }
 export interface AssetNIA {
 
@@ -215,7 +216,7 @@ export interface AssetNIA {
    * @memberof AssetNIA
    * @example rgb:2dkSTbr-jFhznbPmo-TQafzswCN-av4gTsJjX-ttx6CNou5-M98k8Zd
    */
-  asset_id?: string;
+  assetId?: string;
 
   /**
    * @type {AssetIface}
@@ -256,7 +257,7 @@ export interface AssetNIA {
    * @memberof AssetNIA
    * @example 777
    */
-  issued_supply?: number;
+  issuedSupply?: number;
 
   /**
    * @type {number}
@@ -270,7 +271,7 @@ export interface AssetNIA {
    * @memberof AssetNIA
    * @example 1691161979
    */
-  added_at?: number;
+  addedAt?: number;
 
   /**
    * @type {BtcBalance}
@@ -286,19 +287,19 @@ export interface AssetNIA {
 }
 
 export interface AssetIfa {
-  asset_id: string;
+  assetId: string;
   ticker: string;
   name: string;
   details?: string;
   precision: number;
-  initial_supply: number;
-  max_supply: number;
-  known_circulating_supply: number;
+  initialSupply: number;
+  maxSupply: number;
+  knownCirculatingSupply: number;
   timestamp: number;
-  added_at: number;
+  addedAt: number;
   balance: Balance;
   media?: Media;
-  reject_list_url?: string;
+  rejectListUrl?: string;
 }
 
 export interface Media {
@@ -410,14 +411,14 @@ export interface AssetBalanceResponse {
 }
 
 export interface DecodeRgbInvoiceResponse {
-  recipient_id: string;
-  asset_schema?: string;
-  asset_id?: string;
+  recipientId: string;
+  assetSchema?: string;
+  assetId?: string;
   network: string;
   assignment: Assignment;
-  assignment_name?: string;
-  expiration_timestamp?: number;
-  transport_endpoints: string[];
+  assignmentName?: string;
+  expirationTimestamp?: number;
+  transportEndpoints: string[];
 }
 
 export interface Assignment {
