@@ -3,7 +3,7 @@
 
 This is the underlying SDK used by RGB client applications. It provides a complete set of TypeScript/Node.js bindings for interacting with the **RGB Node** and managing RGB-based transfers.
 
-> **RGB Node**: This SDK requires an RGB Node instance to function. For more information about RGB Node, including setup instructions and API documentation, see the [RGB Node repository](https://github.com/RGB-OS/RGB-Node/tree/public).
+> **RGB Node**: This SDK requires an RGB Node instance to function. For more information about RGB Node, including setup instructions and API documentation, see the [RGB Node repository](https://github.com/RGB-OS/RGB-Node).
 
 SDK Overview
 ============
@@ -19,7 +19,7 @@ It assumes the RGB Node is operated **inside the same trust domain** as the SDK 
 > Public/shared RGB Node usage is **not supported** due to privacy and security constraints.
 
 For RGB Node setup and API documentation, see the\
-[RGB Node repository](https://github.com/RGB-OS/RGB-Node/tree/public).
+[RGB Node repository](https://github.com/RGB-OS/RGB-Node).
 
 For a full discussion of the threat model, see **SECURITY.md**.
 * * * * *
