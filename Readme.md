@@ -117,9 +117,8 @@ This pattern enables advanced use cases, such as:
 
 Before using this SDK, you'll need an RGB Node instance running. You can:
 
-- Use the public RGB Node endpoints (testnet/mainnet) - see [RGB Node repository](https://github.com/RGB-OS/RGB-Node/tree/public) for details
-- Self-host your own RGB Node instance - see [RGB Node repository](https://github.com/RGB-OS/RGB-Node/tree/public) for setup instructions
-
+- Use your RGB Node endpoints  - see [RGB Node repository](https://github.com/RGB-OS/RGB-Node) for details
+  
 ### Installation
 
 ```bash
