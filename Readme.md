@@ -5,6 +5,46 @@ This is the underlying SDK used by RGB client applications. It provides a comple
 
 > **RGB Node**: This SDK requires an RGB Node instance to function. For more information about RGB Node, including setup instructions, public endpoints and API documentation, see the [RGB Node repository](https://github.com/RGB-OS/RGB-Node/tree/public).
 
+SDK Overview
+============
+
+This SDK provides TypeScript/Node.js bindings for interacting with an **RGB Node** and orchestrating RGB-based transfers **within a trusted backend environment**.
+
+⚠️ **Important**\
+This SDK is **not designed for untrusted clients** (browsers, mobile apps, public APIs).\
+It assumes the RGB Node is operated **inside the same trust domain** as the SDK user.
+
+> **RGB Node**: This SDK requires an RGB Node instance to function.\
+> The RGB Node **must be self-hosted or privately managed**.\
+> Public/shared RGB Node usage is **not supported** due to privacy and security constraints.
+
+For RGB Node setup and API documentation, see the\
+[RGB Node repository](https://github.com/RGB-OS/RGB-Node/tree/public).
+
+For a full discussion of the threat model, see **SECURITY.md**.
+* * * * *
+
+🔐 Security & Trust Model (Read Before Using)
+---------------------------------------------
+This SDK **assumes full trust in the RGB Node operator**.
+
+By design, the RGB Node:
+-   Receives wallet identifiers (xpubs, master fingerprint)
+-   Maintains wallet state and UTXO sets
+-   Constructs unsigned PSBTs
+-   Observes all wallet activity and transaction metadata
+
+Although **private keys are never held by the RGB Node**, any operator of the node can:
+-   Observe all wallet activity
+-   Permanently correlate transactions to xpubs
+-   Construct malicious PSBTs if compromised
+
+➡️ **This SDK MUST only be used with RGB Nodes you fully control.**
+
+It is **not safe** to point this SDK at:
+-   Public RGB Node endpoints
+-   Third-party hosted nodes outside your trust boundary
+-   Multi-tenant shared services
 ---
 
 ## 🧰 What You Can Do with This Library
